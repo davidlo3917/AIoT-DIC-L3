@@ -1,0 +1,398 @@
+{
+ "weather": [
+  {
+   "StationName": "崇德",
+   "StationId": "C0TB40",
+   "ObsTime": {
+    "DateTime": "2026-09-21T20:00:00+08:00"
+   },
+   "GeoInfo": {
+    "Coordinates": [
+     {
+      "CoordinateName": "TWD67",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "24.167948",
+      "StationLongitude": "121.649251"
+     },
+     {
+      "CoordinateName": "WGS84",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "24.166144",
+      "StationLongitude": "121.657414"
+     }
+    ],
+    "StationAltitude": "8.0",
+    "CountyName": "花蓮縣",
+    "TownName": "秀林鄉",
+    "CountyCode": "10015",
+    "TownCode": "10015110"
+   },
+   "WeatherElement": {
+    "Weather": "-99",
+    "Now": {
+     "Precipitation": "0.0"
+    },
+    "WindDirection": "49.0",
+    "WindSpeed": "3.0",
+    "AirTemperature": "27.6",
+    "RelativeHumidity": "68",
+    "AirPressure": "1010.8",
+    "GustInfo": {
+     "PeakGustSpeed": "-99",
+     "Occurred_at": {
+      "WindDirection": "-99",
+      "DateTime": "-99"
+     }
+    },
+    "DailyExtreme": {
+     "DailyHigh": {
+      "TemperatureInfo": {
+       "AirTemperature": "30.5",
+       "Occurred_at": {
+        "DateTime": "2026-09-21T10:50:00+08:00"
+       }
+      }
+     },
+     "DailyLow": {
+      "TemperatureInfo": {
+       "AirTemperature": "25.2",
+       "Occurred_at": {
+        "DateTime": "2026-09-21T06:00:00+08:00"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "StationName": "磐石",
+   "StationId": "C0TC00",
+   "ObsTime": {
+    "DateTime": "2026-09-21T20:00:00+08:00"
+   },
+   "GeoInfo": {
+    "Coordinates": [
+     {
+      "CoordinateName": "TWD67",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "24.016800",
+      "StationLongitude": "121.387300"
+     },
+     {
+      "CoordinateName": "WGS84",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "24.015008",
+      "StationLongitude": "121.395456"
+     }
+    ],
+    "StationAltitude": "1164.0",
+    "CountyName": "花蓮縣",
+    "TownName": "秀林鄉",
+    "CountyCode": "10015",
+    "TownCode": "10015110"
+   },
+   "WeatherElement": {
+    "Weather": "-99",
+    "Now": {
+     "Precipitation": "-99"
+    },
+    "WindDirection": "-99",
+    "WindSpeed": "-99",
+    "AirTemperature": "-99",
+    "RelativeHumidity": "-99",
+    "AirPressure": "-99",
+    "GustInfo": {
+     "PeakGustSpeed": "-99",
+     "Occurred_at": {
+      "WindDirection": "-99",
+      "DateTime": "-99"
+     }
+    },
+    "DailyExtreme": {
+     "DailyHigh": {
+      "TemperatureInfo": {
+       "AirTemperature": "-99",
+       "Occurred_at": {
+        "DateTime": "-99"
+       }
+      }
+     },
+     "DailyLow": {
+      "TemperatureInfo": {
+       "AirTemperature": "-99",
+       "Occurred_at": {
+        "DateTime": "-99"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "StationName": "臺中",
+   "StationId": "467490",
+   "ObsTime": {
+    "DateTime": "2026-09-21T20:30:00+08:00"
+   },
+   "GeoInfo": {
+    "Coordinates": [
+     {
+      "CoordinateName": "TWD67",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "24.147494",
+      "StationLongitude": "120.675919"
+     },
+     {
+      "CoordinateName": "WGS84",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "24.145736",
+      "StationLongitude": "120.684075"
+     }
+    ],
+    "StationAltitude": "84.0",
+    "CountyName": "臺中市",
+    "TownName": "北區",
+    "CountyCode": "66000",
+    "TownCode": "66000050"
+   },
+   "WeatherElement": {
+    "Weather": "-99",
+    "VisibilityDescription": ">30",
+    "SunshineDuration": "8.7",
+    "Now": {
+     "Precipitation": "-990.0"
+    },
+    "WindDirection": "360.0",
+    "WindSpeed": "2.1",
+    "AirTemperature": "28.6",
+    "RelativeHumidity": "62",
+    "AirPressure": "1001.3",
+    "UVIndex": "0",
+    "Max10MinAverage": {
+     "WindSpeed": "1.8",
+     "Occurred_at": {
+      "WindDirection": "330.0",
+      "DateTime": "2026-09-21T19:51:00+08:00"
+     }
+    },
+    "GustInfo": {
+     "PeakGustSpeed": "3.5",
+     "Occurred_at": {
+      "WindDirection": "340.0",
+      "DateTime": "2026-09-21T19:41:00+08:00"
+     }
+    },
+    "DailyExtreme": {
+     "DailyHigh": {
+      "TemperatureInfo": {
+       "AirTemperature": "33.3",
+       "Occurred_at": {
+        "DateTime": "2026-09-21T13:01:00+08:00"
+       }
+      }
+     },
+     "DailyLow": {
+      "TemperatureInfo": {
+       "AirTemperature": "26.8",
+       "Occurred_at": {
+        "DateTime": "2026-09-21T00:46:00+08:00"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "StationName": "基隆",
+   "StationId": "466940",
+   "ObsTime": {
+    "DateTime": "2026-09-21T20:30:00+08:00"
+   },
+   "GeoInfo": {
+    "Coordinates": [
+     {
+      "CoordinateName": "TWD67",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "25.135104",
+      "StationLongitude": "121.732242"
+     },
+     {
+      "CoordinateName": "WGS84",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "25.133314",
+      "StationLongitude": "121.740475"
+     }
+    ],
+    "StationAltitude": "26.7",
+    "CountyName": "基隆市",
+    "TownName": "仁愛區",
+    "CountyCode": "10017",
+    "TownCode": "10017040"
+   },
+   "WeatherElement": {
+    "Weather": "-99",
+    "VisibilityDescription": ">30",
+    "SunshineDuration": "7.0",
+    "Now": {
+     "Precipitation": "0.0"
+    },
+    "WindDirection": "50.0",
+    "WindSpeed": "1.7",
+    "AirTemperature": "26.2",
+    "RelativeHumidity": "71",
+    "AirPressure": "1010.9",
+    "UVIndex": "0",
+    "Max10MinAverage": {
+     "WindSpeed": "3.0",
+     "Occurred_at": {
+      "WindDirection": "10.0",
+      "DateTime": "2026-09-21T19:11:00+08:00"
+     }
+    },
+    "GustInfo": {
+     "PeakGustSpeed": "5.1",
+     "Occurred_at": {
+      "WindDirection": "30.0",
+      "DateTime": "2026-09-21T19:39:00+08:00"
+     }
+    },
+    "DailyExtreme": {
+     "DailyHigh": {
+      "TemperatureInfo": {
+       "AirTemperature": "28.1",
+       "Occurred_at": {
+        "DateTime": "2026-09-21T12:20:00+08:00"
+       }
+      }
+     },
+     "DailyLow": {
+      "TemperatureInfo": {
+       "AirTemperature": "24.5",
+       "Occurred_at": {
+        "DateTime": "2026-09-21T04:06:00+08:00"
+       }
+      }
+     }
+    }
+   }
+  }
+ ],
+ "rain": [
+  {
+   "StationName": "日月潭",
+   "StationId": "467650",
+   "Maintainer": "中央氣象署",
+   "ObsTime": {
+    "DateTime": "2026-09-21T20:40:00+08:00"
+   },
+   "GeoInfo": {
+    "Coordinates": [
+     {
+      "CoordinateName": "TWD67",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "23.883099",
+      "StationLongitude": "120.899911"
+     },
+     {
+      "CoordinateName": "WGS84",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "23.881325",
+      "StationLongitude": "120.908050"
+     }
+    ],
+    "StationAltitude": "1017.5",
+    "CountyName": "南投縣",
+    "TownName": "魚池鄉",
+    "CountyCode": "10008",
+    "TownCode": "10008090"
+   },
+   "RainfallElement": {
+    "Now": {
+     "Precipitation": "9.5"
+    },
+    "Past10Min": {
+     "Precipitation": "0.0"
+    },
+    "Past1hr": {
+     "Precipitation": "0.0"
+    },
+    "Past3hr": {
+     "Precipitation": "0.0"
+    },
+    "Past6Hr": {
+     "Precipitation": "0.0"
+    },
+    "Past12hr": {
+     "Precipitation": "0.0"
+    },
+    "Past24hr": {
+     "Precipitation": "9.5"
+    },
+    "Past2days": {
+     "Precipitation": "15.5"
+    },
+    "Past3days": {
+     "Precipitation": "15.5"
+    }
+   }
+  },
+  {
+   "StationName": "基隆",
+   "StationId": "466940",
+   "Maintainer": "中央氣象署",
+   "ObsTime": {
+    "DateTime": "2026-09-21T20:40:00+08:00"
+   },
+   "GeoInfo": {
+    "Coordinates": [
+     {
+      "CoordinateName": "TWD67",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "25.135104",
+      "StationLongitude": "121.732242"
+     },
+     {
+      "CoordinateName": "WGS84",
+      "CoordinateFormat": "decimal degrees",
+      "StationLatitude": "25.133314",
+      "StationLongitude": "121.740475"
+     }
+    ],
+    "StationAltitude": "26.7",
+    "CountyName": "基隆市",
+    "TownName": "仁愛區",
+    "CountyCode": "10017",
+    "TownCode": "10017040"
+   },
+   "RainfallElement": {
+    "Now": {
+     "Precipitation": "0.0"
+    },
+    "Past10Min": {
+     "Precipitation": "0.0"
+    },
+    "Past1hr": {
+     "Precipitation": "0.0"
+    },
+    "Past3hr": {
+     "Precipitation": "0.0"
+    },
+    "Past6Hr": {
+     "Precipitation": "0.0"
+    },
+    "Past12hr": {
+     "Precipitation": "0.0"
+    },
+    "Past24hr": {
+     "Precipitation": "0.0"
+    },
+    "Past2days": {
+     "Precipitation": "1.0"
+    },
+    "Past3days": {
+     "Precipitation": "1.0"
+    }
+   }
+  }
+ ]
+}

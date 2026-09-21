@@ -54,6 +54,11 @@ tasks:
     silent: true
     cmds:
       - |
+        # Watchers first (tsx watch / vite respawn their servers), matched by this repo's path in their command line.
+        for pid in $(pgrep -f "{{.ROOT_DIR}}/.*(tsx/dist/cli.mjs watch|vite/bin/vite.js)"); do
+          /bin/kill "$pid" && echo "stopped watcher $pid"
+        done
+        # Then anything still listening on our ports, but only if it was started from inside this repo.
         for pid in $(lsof -t -nP -iTCP:{{.API_PORT}} -iTCP:{{.WEB_PORT}} -sTCP:LISTEN); do
           cwd=$(lsof -a -p "$pid" -d cwd -Fn | sed -n 's/^n//p')
           case "$cwd" in
@@ -67,6 +72,13 @@ tasks:
     silent: true
     cmds:
       - curl -s -w '\n%{http_code}\n' http://localhost:{{.API_PORT}}/api/health
+
+  ingest:
+    desc: Trigger station ingestion on the local api (api must be running)
+    silent: true
+    dotenv: ['.env']
+    cmds:
+      - curl -s -X POST -H "Authorization{{":"}} Bearer $INGESTION_SECRET" http://localhost:{{.API_PORT}}/api/internal/ingest/stations
 
   check:
     desc: Everything CI runs — lint, typecheck, test, build
