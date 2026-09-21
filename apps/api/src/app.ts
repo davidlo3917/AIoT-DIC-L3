@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { db } from './db/client.js'
+import { ingestGrids, pruneFrames } from './ingestion/grids.js'
 import { ingestStations } from './ingestion/stations.js'
 import { ingestAuth } from './middleware/ingestAuth.js'
 import { publicRoutes } from './routes/public.js'
@@ -19,6 +20,8 @@ const app = new Hono().basePath('/api')
   .route('/', publicRoutes)
   .use('/internal/*', ingestAuth)
   .post('/internal/ingest/stations', async (c) => c.json(await ingestStations()))
+  .post('/internal/ingest/grids', async (c) => c.json(await ingestGrids()))
+  .post('/internal/prune/frames', async (c) => c.json(await pruneFrames()))
 
 // Errors reach logs in full; clients get a generic body (CWA/DB messages can carry internals).
 app.onError((e, c) => {
