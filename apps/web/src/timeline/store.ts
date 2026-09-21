@@ -13,7 +13,8 @@ export const useStore = <T,>(select: (s: State) => T) => useSyncExternalStore((l
 export const currentFrame = (s: State): Frame | undefined => s.frames[s.index]
 
 export const actions = {
-  setLayer: (layer: LayerId) => set({ layer, frames: [], index: -1, playing: false }),
+  // Re-picking the active layer must do nothing: its frames are only fetched when the layer changes, so clearing them would leave "Loading…" forever.
+  setLayer: (layer: LayerId) => layer === state.layer || set({ layer, frames: [], index: -1, playing: false }),
   toggleStations: () => set({ showStations: !state.showStations }),
   selectStation: (selectedStation: number | null) => set({ selectedStation }),
   /** New frames keep the clock where it was if that instant still exists, otherwise jump to the newest. */

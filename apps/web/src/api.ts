@@ -14,5 +14,19 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 
 export const getStations = () => get<Station[]>('/stations')
 export const getFrames = (layer: FrameLayer, signal?: AbortSignal) => get<{ frames: Frame[] }>(`/frames?layer=${layer}`, signal).then((r) => r.frames)
-export const getObservations = (at: string, signal?: AbortSignal) => get<{ observations: Observation[] }>(`/observations?at=${encodeURIComponent(at)}`, signal).then((r) => r.observations)
+// One request per instant, shared by the station dots, the humidity surface and the playback preloader. Not abortable:
+// the server runs an abandoned query to the end anyway, so aborting only threw away an answer replay would want.
+const observations = new Map<string, Promise<Observation[]>>()
+export function getObservations(at: string): Promise<Observation[]> {
+  let hit = observations.get(at)
+  if (!hit) {
+    hit = get<{ observations: Observation[] }>(`/observations?at=${encodeURIComponent(at)}`).then((r) => r.observations)
+    observations.set(at, hit)
+    // Stations keep reporting for a while after the instant itself (CWA publishes ~15 min late): only the settled past is kept.
+    const settled = Date.now() - Date.parse(at) > 30 * 60e3
+    hit.then(() => settled || observations.delete(at), () => observations.delete(at))
+    if (observations.size > 60) observations.delete(observations.keys().next().value!)
+  }
+  return hit
+}
 export const getHistory = (cwaId: string, signal?: AbortSignal) => get<{ observations: (Readings & { observedAt: string })[] }>(`/stations/${cwaId}/history`, signal).then((r) => r.observations)

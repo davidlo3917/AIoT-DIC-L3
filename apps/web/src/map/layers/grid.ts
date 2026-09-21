@@ -37,34 +37,36 @@ async function decode(url: string, width: number, height: number, offset: number
 // the difference between smooth playback and the tab being killed for memory.
 const IMAGE_SIZE = Math.max(window.innerWidth, window.innerHeight) * window.devicePixelRatio > 2000 ? 1800 : 1200
 
-const images = new Map<string, Promise<ImageBitmap>>()
-export function loadImage(url: string): Promise<ImageBitmap> {
+// Cached ready to show (decoded, resized AND redrawn for Mercator), so presenting a frame during playback is one blit.
+const images = new Map<string, Promise<OffscreenCanvas>>()
+export function loadImage(url: string, bounds: Field['bounds']): Promise<OffscreenCanvas> {
   let hit = images.get(url)
   if (!hit) {
     hit = fetch(url).then(async (res) => {
       if (!res.ok) throw new Error(`${url}: ${res.status}`)
       const blob = await res.blob()
       // Older Safari rejects the resize options; fall back to a full-size decode rather than to no radar.
-      return createImageBitmap(blob, { resizeWidth: IMAGE_SIZE, resizeHeight: IMAGE_SIZE, resizeQuality: 'medium' }).catch(() => createImageBitmap(blob))
+      const bitmap = await createImageBitmap(blob, { resizeWidth: IMAGE_SIZE, resizeHeight: IMAGE_SIZE, resizeQuality: 'medium' }).catch(() => createImageBitmap(blob))
+      try { return resample(bitmap, bounds) } finally { bitmap.close() }
     })
     images.set(url, hit)
     hit.catch(() => images.delete(url))
-    if (images.size > 8) { const oldest = images.keys().next().value!; images.get(oldest)?.then((b) => b.close(), () => {}); images.delete(oldest) }
+    if (images.size > 8) images.delete(images.keys().next().value!)
   }
   return hit
 }
 
 /** Same Mercator correction as `paint`, for an equirectangular picture: redraw it one row at a time. */
-export function paintImage(bitmap: ImageBitmap, [, south, , north]: Field['bounds'], canvas: HTMLCanvasElement) {
-  const W = (canvas.width = Math.min(bitmap.width, IMAGE_SIZE)), H = (canvas.height = Math.min(bitmap.height, IMAGE_SIZE))
-  const ctx = canvas.getContext('2d')!
-  ctx.clearRect(0, 0, W, H)
+function resample(bitmap: ImageBitmap, [, south, , north]: Field['bounds']) {
+  const W = Math.min(bitmap.width, IMAGE_SIZE), H = Math.min(bitmap.height, IMAGE_SIZE)
+  const canvas = new OffscreenCanvas(W, H), ctx = canvas.getContext('2d')!
   const yTop = mercY(north), yBottom = mercY(south)
   const srcRow = (y: number) => ((north - latOfMercY(yTop + (y / H) * (yBottom - yTop))) / (north - south)) * bitmap.height
   for (let y = 0; y < H; y++) {
     const from = srcRow(y)
     ctx.drawImage(bitmap, 0, from, bitmap.width, Math.max(1, srcRow(y + 1) - from), 0, y, W, 1)
   }
+  return canvas
 }
 
 const mercY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))
