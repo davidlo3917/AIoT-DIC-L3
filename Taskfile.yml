@@ -120,6 +120,12 @@ tasks:
     cmds:
       - pnpm --filter api cron:status
 
+  backfill:stations:
+    desc: Fill the last 24 h of hourly station readings from CWA's history API (runs on the deployed API; idempotent)
+    deps: [install]
+    cmds:
+      - pnpm --filter api backfill:stations {{.CLI_ARGS}}
+
   prune:check:
     desc: Verify the retention prune keeps/thins/expires the right rows (runs in a transaction that is always rolled back)
     deps: [install]

@@ -11,6 +11,7 @@
     "db:push": "node --env-file=../../.env scripts/db-push.mjs",
     "cron:secrets": "node --env-file=../../.env scripts/cron-secrets.mjs",
     "cron:status": "node --env-file=../../.env scripts/cron-status.mjs",
+    "backfill:stations": "node --env-file=../../.env scripts/backfill-stations.mjs",
     "prune:check": "node --env-file=../../.env scripts/prune-check.mjs"
   },
   "dependencies": {

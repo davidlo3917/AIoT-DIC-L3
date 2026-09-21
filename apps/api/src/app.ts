@@ -3,9 +3,10 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { db } from './db/client.js'
 import { ingestGrids, pruneFrames } from './ingestion/grids.js'
-import { ingestStations } from './ingestion/stations.js'
+import { backfillStations, ingestStations } from './ingestion/stations.js'
 import { ingestAuth } from './middleware/ingestAuth.js'
 import { publicRoutes } from './routes/public.js'
+import { backfillQuery } from './routes/query.js'
 
 const app = new Hono().basePath('/api')
   .get('/health', async (c) => {
@@ -21,6 +22,10 @@ const app = new Hono().basePath('/api')
   .use('/internal/*', ingestAuth)
   .post('/internal/ingest/stations', async (c) => c.json(await ingestStations()))
   .post('/internal/ingest/grids', async (c) => c.json(await ingestGrids())) // grids *and* radar imagery: one cron job
+  .post('/internal/backfill/stations', async (c) => {
+    const q = backfillQuery.safeParse(c.req.query())
+    return q.success ? c.json(await backfillStations(q.data)) : c.json({ error: q.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }, 400)
+  })
   .post('/internal/prune/frames', async (c) => c.json(await pruneFrames()))
 
 // Errors reach logs in full; clients get a generic body (CWA/DB messages can carry internals).

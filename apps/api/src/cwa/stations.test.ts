@@ -55,3 +55,18 @@ test('malformed records are skipped, not thrown', () => {
   const noWgs = structuredClone(fx.weather[0]); noWgs.GeoInfo.Coordinates = noWgs.GeoInfo.Coordinates.filter((c: any) => c.CoordinateName !== 'WGS84')
   assert.equal(normalizeStation(noWgs), null)
 })
+
+test('history XML reads into the same shape as the JSON API', async () => {
+  const { xmlToObject } = await import('./client.js')
+  // Two real records from CWA's history file for 2026-09-21 12:00 (+08:00).
+  const records = xmlToObject(readFileSync(new URL('./fixtures/history-stations.xml', import.meta.url), 'utf8')).dataset.Station
+  assert.equal(records.length, 2) // repeated siblings → array
+  const { station, observation } = normalizeStation(records[0])!
+  assert.equal(station.cwaStationId, 'C0TB40')
+  assert.equal(station.latitude, 24.166144) // second <Coordinates> (WGS84), so repeated children are arrays too
+  assert.equal(observation.observedAt.toISOString(), '2026-09-21T04:00:00.000Z')
+  assert.equal(observation.temperature, 30)
+  assert.equal(observation.humidity, 63)
+  assert.equal(observation.gustSpeed, null) // -99 sentinel, nested under GustInfo
+  assert.equal(xmlToObject('<a>R&amp;D</a>').a, 'R&D')
+})

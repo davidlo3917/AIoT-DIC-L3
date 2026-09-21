@@ -1,5 +1,5 @@
 import { inArray, sql } from 'drizzle-orm'
-import { fetchDatastore } from '../cwa/client.js'
+import { fetchDatastore, fetchHistoryFile, fetchHistoryTimes, xmlToObject } from '../cwa/client.js'
 import { datastoreResponse, normalizeStation, type NormalizedStation } from '../cwa/stations.js'
 import { db } from '../db/client.js'
 import { stationObservations, stations } from '../db/schema.js'
@@ -20,7 +20,17 @@ export async function ingestStations() {
     return { id, received: records.length, skipped: records.length - ok.length, ok }
   }))
   const all = fetched.flatMap((f) => f.ok)
+  const meta = await upsertStations(all)
+  const { observations, newObservations } = await storeObservations(all)
+  return {
+    datasets: fetched.map(({ id, received, skipped }) => ({ id, received, skipped })),
+    stations: meta,
+    observations,
+    newObservations,
+  }
+}
 
+async function upsertStations(all: NormalizedStation[]) {
   const meta = new Map(all.map((r) => [r.station.cwaStationId, r.station])) // last dataset wins
   for (const part of chunks([...meta.values()], CHUNK)) {
     await db.insert(stations).values(part).onConflictDoUpdate({
@@ -32,15 +42,23 @@ export async function ingestStations() {
       },
     })
   }
+  return meta.size
+}
+
+/** Observations of stations we don't know are dropped (a backfill reads one dataset, so it never writes station metadata). */
+async function storeObservations(all: NormalizedStation[]) {
+  if (!all.length) return { observations: 0, newObservations: 0 }
+  const wanted = [...new Set(all.map((r) => r.station.cwaStationId))]
   const ids = new Map((await db.select({ id: stations.id, cwa: stations.cwaStationId }).from(stations)
-    .where(inArray(stations.cwaStationId, [...meta.keys()]))).map((r) => [r.cwa, r.id]))
+    .where(inArray(stations.cwaStationId, wanted))).map((r) => [r.cwa, r.id]))
 
   // A station can appear in several datasets with the same timestamp (weather + rain). Postgres rejects two
   // rows hitting the same conflict target in one statement, so merge them here first — non-null wins.
   type Row = typeof stationObservations.$inferInsert
   const merged = new Map<string, Row>()
   for (const { station, observation } of all) {
-    const stationId = ids.get(station.cwaStationId)!
+    const stationId = ids.get(station.cwaStationId)
+    if (stationId === undefined) continue
     const k = `${stationId}|${observation.observedAt.getTime()}`
     const prev = merged.get(k)
     if (!prev) merged.set(k, { stationId, ...observation })
@@ -62,11 +80,24 @@ export async function ingestStations() {
     }).returning({ inserted: sql<boolean>`(xmax = 0)` })
     written += res.filter((r) => r.inserted).length
   }
+  return { observations: merged.size, newObservations: written }
+}
 
-  return {
-    datasets: fetched.map(({ id, received, skipped }) => ({ id, received, skipped })),
-    stations: meta.size,
-    observations: merged.size,
-    newObservations: written,
+// CWA keeps 24 hourly snapshots of the automatic stations (the only station dataset with a usable history).
+const HISTORY_DATASET = 'O-A0001-001'
+
+/**
+ * Fills the hours before our own ingestion started (or a gap it left). Newest first, `limit` files per call so one
+ * call fits a serverless invocation; pass the returned `next` back as `before` until it is null.
+ */
+export async function backfillStations({ before, limit }: { before?: Date; limit: number }) {
+  const times = (await fetchHistoryTimes(HISTORY_DATASET)).filter((t) => !before || new Date(t) < before)
+  const files = []
+  for (const time of times.slice(0, limit)) {
+    // The root <cwaopendata xmlns=…> carries an attribute, so the reader starts one level in, at <dataset>.
+    const records = [xmlToObject(await fetchHistoryFile(HISTORY_DATASET, time)).dataset?.Station ?? []].flat()
+    const ok = records.map(normalizeStation).filter((r): r is NormalizedStation => r !== null)
+    files.push({ time: new Date(time).toISOString(), received: records.length, skipped: records.length - ok.length, ...(await storeObservations(ok)) })
   }
+  return { files, next: times.length > limit ? files.at(-1)!.time : null }
 }
