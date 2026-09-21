@@ -73,10 +73,55 @@ async function ingestGrid(spec: GridSpec) {
   return { layer: spec.layer, time: validAt.toISOString(), stored: true, bytes: png.length }
 }
 
-/** One grid failing (CWA hiccup) must not block the other. */
+// Ready-made images (radar now, satellite later): CWA's JSON points at a picture on its public S3; we keep a copy
+// per timestamp, because CWA only ever serves the latest one and the timeline needs history.
+type ImageSpec = { layer: 'radar'; datasetId: string; mime: 'image/png' | 'image/jpeg'; ext: string }
+const IMAGES: ImageSpec[] = [
+  { layer: 'radar', datasetId: 'O-A0058-005', mime: 'image/png', ext: 'png' }, // composite reflectivity, transparent background, every 10 min
+]
+
+const CWA_IMAGE_HOST = 'https://cwaopendata.s3.ap-northeast-1.amazonaws.com/'
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // same cap as the bucket
+
+const range = (text: unknown) => {
+  const m = /^(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)$/.exec(String(text).trim()) // "115.00-126.50"
+  if (!m) throw new Error(`unreadable range "${text}"`)
+  return [Number(m[1]), Number(m[2])] as const
+}
+
+async function ingestImage(spec: ImageSpec) {
+  const d = (await fetchFileApi(spec.datasetId)).cwaopendata.dataset
+  const validAt = new Date(d.DateTime)
+  if (Number.isNaN(validAt.getTime())) throw new Error(`${spec.datasetId}: unreadable time "${d.DateTime}"`)
+
+  const [existing] = await db.select({ id: weatherFrames.id }).from(weatherFrames)
+    .where(and(eq(weatherFrames.layerType, spec.layer), eq(weatherFrames.validAt, validAt)))
+  if (existing) return { layer: spec.layer, time: validAt.toISOString(), stored: false }
+
+  // The URL comes out of a remote document, so it is untrusted input: only ever fetch from CWA's own bucket.
+  const url = String(d.resource?.ProductURL)
+  if (!url.startsWith(CWA_IMAGE_HOST)) throw new Error(`${spec.datasetId}: refusing to fetch image from unexpected host`)
+  const res = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' })
+  if (!res.ok) throw new Error(`${spec.datasetId}: image responded ${res.status}`)
+  const image = Buffer.from(await res.arrayBuffer())
+  if (image.length === 0 || image.length > MAX_IMAGE_BYTES) throw new Error(`${spec.datasetId}: image is ${image.length} bytes`)
+
+  const [minLon, maxLon] = range(d.datasetInfo.parameterSet.LongitudeRange)
+  const [minLat, maxLat] = range(d.datasetInfo.parameterSet.LatitudeRange)
+  const storagePath = framePath(spec.layer, validAt).replace(/png$/, spec.ext)
+  await upload(storagePath, image, spec.mime)
+  await db.insert(weatherFrames).values({
+    layerType: spec.layer, observedAt: validAt, validAt, storagePath, minLon, maxLon, minLat, maxLat,
+    metadataJson: { projection: 'equirectangular', dimension: d.datasetInfo.parameterSet.ImageDimension },
+  }).onConflictDoNothing({ target: weatherFrames.storagePath })
+  return { layer: spec.layer, time: validAt.toISOString(), stored: true, bytes: image.length }
+}
+
+/** Every product is independent: one failing (CWA hiccup) must not block the others. */
 export async function ingestGrids() {
-  const results = await Promise.allSettled(GRIDS.map(ingestGrid))
-  return results.map((r, i) => r.status === 'fulfilled' ? r.value : (console.error(`ingest ${GRIDS[i].layer} failed:`, r.reason), { layer: GRIDS[i].layer, error: true }))
+  const jobs = [...GRIDS.map((g) => ({ layer: g.layer, run: () => ingestGrid(g) })), ...IMAGES.map((i) => ({ layer: i.layer, run: () => ingestImage(i) }))]
+  const results = await Promise.allSettled(jobs.map((j) => j.run()))
+  return results.map((r, i) => r.status === 'fulfilled' ? r.value : (console.error(`ingest ${jobs[i].layer} failed:`, r.reason), { layer: jobs[i].layer, error: true }))
 }
 
 export const FRAME_RETENTION_DAYS = 14 // free-tier Storage is 1 GB

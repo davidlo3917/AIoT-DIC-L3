@@ -1,11 +1,11 @@
 import { useSyncExternalStore } from 'react'
 import type { Frame } from '../api'
-import type { Variable } from '../ramps'
+import type { LayerId } from '../layers'
 
 // One timeline for every layer (DESIGN §12): a layer supplies frames, the store owns the clock.
-type State = { variable: Variable; showStations: boolean; frames: Frame[]; index: number; playing: boolean; speed: number; selectedStation: number | null }
+type State = { layer: LayerId; showStations: boolean; frames: Frame[]; index: number; playing: boolean; speed: number; selectedStation: number | null }
 
-let state: State = { variable: 'temperature', showStations: true, frames: [], index: -1, playing: false, speed: 1, selectedStation: null }
+let state: State = { layer: 'temperature', showStations: true, frames: [], index: -1, playing: false, speed: 1, selectedStation: null }
 const listeners = new Set<() => void>()
 const set = (patch: Partial<State>) => { state = { ...state, ...patch }; listeners.forEach((l) => l()) }
 
@@ -13,7 +13,7 @@ export const useStore = <T,>(select: (s: State) => T) => useSyncExternalStore((l
 export const currentFrame = (s: State): Frame | undefined => s.frames[s.index]
 
 export const actions = {
-  setVariable: (variable: Variable) => set({ variable, frames: [], index: -1, playing: false }),
+  setLayer: (layer: LayerId) => set({ layer, frames: [], index: -1, playing: false }),
   toggleStations: () => set({ showStations: !state.showStations }),
   selectStation: (selectedStation: number | null) => set({ selectedStation }),
   /** New frames keep the clock where it was if that instant still exists, otherwise jump to the newest. */

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getHistory, type Readings, type Station } from '../api'
+import { LAYERS } from '../layers'
 import { RAMPS, type Variable } from '../ramps'
 import { actions, useStore } from '../timeline/store'
 import Sparkline from './Sparkline'
@@ -11,7 +12,7 @@ const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
 const latest = (rows: Row[], k: keyof Readings) => { for (let i = rows.length - 1; i >= 0; i--) if (rows[i][k] != null) return rows[i][k]; return null }
 
 export default function StationCard({ stations }: { stations: Station[] }) {
-  const id = useStore((s) => s.selectedStation), variable = useStore((s) => s.variable)
+  const id = useStore((s) => s.selectedStation), variable = LAYERS[useStore((s) => s.layer)].stations
   const station = stations.find((s) => s.id === id)
   const [rows, setRows] = useState<Row[] | 'error' | null>(null)
 

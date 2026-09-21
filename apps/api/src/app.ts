@@ -20,7 +20,7 @@ const app = new Hono().basePath('/api')
   .route('/', publicRoutes)
   .use('/internal/*', ingestAuth)
   .post('/internal/ingest/stations', async (c) => c.json(await ingestStations()))
-  .post('/internal/ingest/grids', async (c) => c.json(await ingestGrids()))
+  .post('/internal/ingest/grids', async (c) => c.json(await ingestGrids())) // grids *and* radar imagery: one cron job
   .post('/internal/prune/frames', async (c) => c.json(await pruneFrames()))
 
 // Errors reach logs in full; clients get a generic body (CWA/DB messages can carry internals).

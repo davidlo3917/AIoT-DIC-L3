@@ -36,7 +36,8 @@ Public, read-only, CDN-cached. Times are ISO-8601 with an offset (`2026-09-21T20
 
 ## Scheduled jobs (Supabase Cron)
 
-`ingest-stations` and `ingest-grids` (CWA temperature + radar-rain grids → PNG frames in Storage) every 10 min;
+`ingest-stations` and `ingest-grids` (CWA temperature + radar-rain grids and the composite radar image → frames in
+Storage) every 10 min;
 `prune-frames` nightly (image frames older than 14 days); `prune` nightly (10-minute data for 3 days, hourly for 60, then deleted — sized for the
 500 MB free tier). `task cron:status` shows runs, responses and the daily DB-size log; `task cron:secrets` reloads the
 API URL + token into Supabase Vault; `task prune:check` verifies the prune in a rolled-back transaction.

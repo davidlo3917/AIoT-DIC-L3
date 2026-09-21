@@ -7,7 +7,7 @@ export type Field = { width: number; height: number; values: Float32Array; bound
 const cache = new Map<string, Promise<Field>>() // frames are immutable per URL; keep the last few decoded
 export function loadField(frame: Frame): Promise<Field> {
   const { url, meta, bounds } = frame
-  if (!url || !meta || !bounds) return Promise.reject(new Error('frame has no image'))
+  if (!url || !bounds || meta?.encoding !== 'rg16') return Promise.reject(new Error('frame is not an encoded grid'))
   let hit = cache.get(url)
   if (!hit) {
     hit = decode(url, meta.width, meta.height, meta.offset, meta.scale, bounds)
@@ -29,6 +29,42 @@ async function decode(url: string, width: number, height: number, offset: number
   const values = new Float32Array(width * height)
   for (let i = 0; i < values.length; i++) values[i] = px[i * 4 + 3] ? ((px[i * 4] << 8) | px[i * 4 + 1]) / scale - offset : NaN
   return { width, height, values, bounds }
+}
+
+// ---- ready-made images (radar) ---------------------------------------------------------------------------------
+
+// CWA's radar PNG is 3600² (52 MB decoded). Decode it at a size the screen can actually show; on a phone that is
+// the difference between smooth playback and the tab being killed for memory.
+const IMAGE_SIZE = Math.max(window.innerWidth, window.innerHeight) * window.devicePixelRatio > 2000 ? 1800 : 1200
+
+const images = new Map<string, Promise<ImageBitmap>>()
+export function loadImage(url: string): Promise<ImageBitmap> {
+  let hit = images.get(url)
+  if (!hit) {
+    hit = fetch(url).then(async (res) => {
+      if (!res.ok) throw new Error(`${url}: ${res.status}`)
+      const blob = await res.blob()
+      // Older Safari rejects the resize options; fall back to a full-size decode rather than to no radar.
+      return createImageBitmap(blob, { resizeWidth: IMAGE_SIZE, resizeHeight: IMAGE_SIZE, resizeQuality: 'medium' }).catch(() => createImageBitmap(blob))
+    })
+    images.set(url, hit)
+    hit.catch(() => images.delete(url))
+    if (images.size > 8) { const oldest = images.keys().next().value!; images.get(oldest)?.then((b) => b.close(), () => {}); images.delete(oldest) }
+  }
+  return hit
+}
+
+/** Same Mercator correction as `paint`, for an equirectangular picture: redraw it one row at a time. */
+export function paintImage(bitmap: ImageBitmap, [, south, , north]: Field['bounds'], canvas: HTMLCanvasElement) {
+  const W = (canvas.width = Math.min(bitmap.width, IMAGE_SIZE)), H = (canvas.height = Math.min(bitmap.height, IMAGE_SIZE))
+  const ctx = canvas.getContext('2d')!
+  ctx.clearRect(0, 0, W, H)
+  const yTop = mercY(north), yBottom = mercY(south)
+  const srcRow = (y: number) => ((north - latOfMercY(yTop + (y / H) * (yBottom - yTop))) / (north - south)) * bitmap.height
+  for (let y = 0; y < H; y++) {
+    const from = srcRow(y)
+    ctx.drawImage(bitmap, 0, from, bitmap.width, Math.max(1, srcRow(y + 1) - from), 0, y, W, 1)
+  }
 }
 
 const mercY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))

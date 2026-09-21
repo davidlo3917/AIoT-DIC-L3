@@ -26,6 +26,13 @@ export const RAMPS = {
 
 export type Variable = keyof typeof RAMPS
 
+// Read off CWA's own radar PNG (58 distinct colours, one per dBZ): cyan→blue to 14, greens to 25, yellow at 30,
+// orange by 40, reds to 50, magenta beyond. Used for the legend only — the image itself is drawn as published.
+export const RADAR_RAMP: Ramp = {
+  unit: 'dBZ', ticks: [0, 15, 30, 45, 60], format: (v) => v.toFixed(0),
+  stops: [[0, '#00ffff'], [14, '#0000ff'], [15, '#00ff00'], [25, '#009600'], [30, '#ffff00'], [40, '#ff9600'], [41, '#ff0000'], [50, '#960000'], [51, '#ff00ff'], [65, '#9600ff']],
+}
+
 const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number]
 
 /** value → [r, g, b, a]. Below the first stop of a stepped ramp (e.g. rain < 1 mm) is transparent. */
