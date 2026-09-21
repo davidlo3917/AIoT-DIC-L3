@@ -119,3 +119,9 @@ tasks:
     deps: [install]
     cmds:
       - pnpm --filter api cron:status
+
+  prune:check:
+    desc: Verify the retention prune keeps/thins/expires the right rows (runs in a transaction that is always rolled back)
+    deps: [install]
+    cmds:
+      - pnpm --filter api prune:check

@@ -13,4 +13,6 @@ console.table(await sql`select id, status_code, timed_out, left(coalesce(error_m
 console.log('data')
 console.table(await sql`select count(*)::int as observations, count(distinct observed_at)::int as timestamps,
   max(observed_at) as newest, pg_size_pretty(pg_database_size(current_database())) as db_size from station_observations`)
+console.log('daily size log (written by the nightly prune; free tier cap is 500 MB)')
+console.table(await sql`select day, pg_size_pretty(db_bytes) as db_size, observations, thinned, expired from private.db_size_log order by day desc limit 7`)
 await sql.end()

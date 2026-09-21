@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import { db } from './db/client.js'
 import { ingestStations } from './ingestion/stations.js'
 import { ingestAuth } from './middleware/ingestAuth.js'
+import { publicRoutes } from './routes/public.js'
 
 const app = new Hono().basePath('/api')
   .get('/health', async (c) => {
@@ -15,6 +16,7 @@ const app = new Hono().basePath('/api')
     })
     return c.json({ ok: dbOk, db: dbOk }, dbOk ? 200 : 503)
   })
+  .route('/', publicRoutes)
   .use('/internal/*', ingestAuth)
   .post('/internal/ingest/stations', async (c) => c.json(await ingestStations()))
 

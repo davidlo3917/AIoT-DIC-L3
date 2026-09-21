@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "node --env-file=../../.env scripts/db-push.mjs",
     "cron:secrets": "node --env-file=../../.env scripts/cron-secrets.mjs",
-    "cron:status": "node --env-file=../../.env scripts/cron-status.mjs"
+    "cron:status": "node --env-file=../../.env scripts/cron-status.mjs",
+    "prune:check": "node --env-file=../../.env scripts/prune-check.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",
