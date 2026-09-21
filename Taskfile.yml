@@ -1,0 +1,97 @@
+version: '3'
+
+# `task` lists everything. Secrets come from .env, which the api/db scripts load themselves.
+
+vars:
+  API_PORT: 8787
+  WEB_PORT: 5273 # keep in sync with apps/web/vite.config.ts
+
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task --list
+
+  node:
+    internal: true
+    silent: true
+    preconditions:
+      - sh: '[ "$(node -p "process.versions.node.split(String.fromCharCode(46))[0]")" -ge 22 ]'
+        msg: 'Node 22+ required (CI and Vercel run 22). Run `nvm use` in this shell first.'
+      - sh: '[ -f .env ]'
+        msg: 'No .env — run `cp .env.example .env` and fill it in (DESIGN.md §17).'
+
+  install:
+    desc: Install dependencies
+    deps: [node]
+    sources: [pnpm-lock.yaml, package.json, apps/*/package.json]
+    cmds:
+      - pnpm install
+
+  dev:
+    desc: Run web (:5273) + api (:8787, proxied at /api) with hot reload
+    deps: [install]
+    preconditions:
+      - sh: '! lsof -nP -iTCP:{{.API_PORT}} -iTCP:{{.WEB_PORT}} -sTCP:LISTEN >/dev/null'
+        msg: 'Port {{.API_PORT}} or {{.WEB_PORT}} is taken. If it is a stale server from this repo, `task stop` clears it.'
+    cmds:
+      - pnpm dev
+
+  api:
+    desc: Run only the api (:8787)
+    deps: [install]
+    cmds:
+      - pnpm --filter api dev
+
+  web:
+    desc: Run only the web app (:5273)
+    deps: [install]
+    cmds:
+      - pnpm --filter web dev
+
+  stop:
+    desc: Stop dev servers started from this repo (never touches other projects on the same ports)
+    silent: true
+    cmds:
+      - |
+        for pid in $(lsof -t -nP -iTCP:{{.API_PORT}} -iTCP:{{.WEB_PORT}} -sTCP:LISTEN); do
+          cwd=$(lsof -a -p "$pid" -d cwd -Fn | sed -n 's/^n//p')
+          case "$cwd" in
+            "{{.ROOT_DIR}}"*) /bin/kill "$pid" && echo "stopped $pid ($cwd)" ;;
+            *) echo "left alone: $pid belongs to $cwd" ;;
+          esac
+        done
+
+  health:
+    desc: Hit the local api health check (api must be running)
+    silent: true
+    cmds:
+      - curl -s -w '\n%{http_code}\n' http://localhost:{{.API_PORT}}/api/health
+
+  check:
+    desc: Everything CI runs — lint, typecheck, test, build
+    deps: [install]
+    cmds:
+      - pnpm lint
+      - pnpm typecheck
+      - pnpm test
+      - pnpm build
+
+  db:generate:
+    desc: 'Schema → SQL migration in supabase/migrations (review, then commit). Usage: task db:generate -- --name add_x'
+    deps: [install]
+    cmds:
+      - pnpm --filter api exec drizzle-kit generate {{.CLI_ARGS}}
+
+  db:plan:
+    desc: Show which migrations would be applied (dry run)
+    deps: [install]
+    cmds:
+      - pnpm db:push --dry-run
+
+  db:push:
+    desc: Apply pending migrations to the Supabase database
+    deps: [install]
+    prompt: This changes the live Supabase database. Run `task db:plan` first. Continue?
+    cmds:
+      - pnpm db:push --yes

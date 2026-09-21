@@ -1,0 +1,27 @@
+{
+  "name": "api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/dev.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "node --env-file=../../.env scripts/db-push.mjs"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.3",
+    "hono": "^4.13.8",
+    "postgres": "^3.4.9",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@types/node": "^22.20.4",
+    "drizzle-kit": "^0.31.11",
+    "supabase": "^2.117.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
