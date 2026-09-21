@@ -107,3 +107,15 @@ tasks:
     prompt: This changes the live Supabase database. Run `task db:plan` first. Continue?
     cmds:
       - pnpm db:push --yes
+
+  cron:secrets:
+    desc: Copy API_BASE_URL + INGESTION_SECRET from .env into Supabase Vault (the cron job reads them there)
+    deps: [install]
+    cmds:
+      - pnpm --filter api cron:secrets
+
+  cron:status:
+    desc: Show scheduled jobs, their recent runs, and the HTTP responses they got
+    deps: [install]
+    cmds:
+      - pnpm --filter api cron:status

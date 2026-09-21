@@ -8,7 +8,9 @@
     "lint": "tsc --noEmit",
     "test": "node --import tsx --test 'src/**/*.test.ts'",
     "db:generate": "drizzle-kit generate",
-    "db:push": "node --env-file=../../.env scripts/db-push.mjs"
+    "db:push": "node --env-file=../../.env scripts/db-push.mjs",
+    "cron:secrets": "node --env-file=../../.env scripts/cron-secrets.mjs",
+    "cron:status": "node --env-file=../../.env scripts/cron-status.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",
