@@ -2,6 +2,16 @@
 
 Windy-style weather map for Taiwan on CWA Open Data. Design: [DESIGN.md](DESIGN.md).
 
+## Map controls
+
+The dark basemap keeps coastlines, boundaries, and Chinese-first city names. Main roads appear at zoom 9;
+buildings, minor roads, railways, and land-use textures are omitted. Temperature, rain, radar, and humidity remain available.
+
+Stations are off by default; enable **Stations** and zoom in (dots at zoom 8, values at zoom 9) to select a station.
+Its readings follow the selected map time, with a dashed time marker on the last-24-hour chart.
+The timeline initially follows new frames automatically. Scrubbing holds a historical time; **Latest** resumes following.
+**Retry** reloads unavailable data. Rain is labeled as past-hour accumulation in millimetres.
+
 ## Develop
 
 ```bash

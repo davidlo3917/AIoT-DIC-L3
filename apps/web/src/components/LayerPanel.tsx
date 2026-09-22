@@ -4,17 +4,17 @@ import { actions, useStore } from '../timeline/store'
 export default function LayerPanel() {
   const layer = useStore((s) => s.layer), showStations = useStore((s) => s.showStations)
   return (
-    <nav aria-label="Weather layers" className="pointer-events-auto flex gap-1 overflow-x-auto rounded-xl bg-slate-900/80 p-1 shadow-lg backdrop-blur sm:w-44 sm:flex-col sm:overflow-visible">
+    <nav aria-label="Weather layers" className="weather-panel pointer-events-auto flex gap-1 overflow-x-auto p-1 sm:w-44 sm:flex-col sm:overflow-visible">
       {(Object.keys(LAYERS) as LayerId[]).map((id) => (
         <button key={id} type="button" aria-pressed={layer === id} onClick={() => actions.setLayer(id)} title={LAYERS[id].hint}
-          className={`shrink-0 rounded-lg px-2.5 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 sm:px-3 ${layer === id ? 'bg-sky-500/90 font-semibold text-white' : 'text-slate-200 hover:bg-white/10'}`}>
+          className={`ui-button shrink-0 px-3 py-2 text-left text-sm transition-colors ${layer === id ? 'ui-active font-semibold' : 'ui-muted'}`}>
           {LAYERS[id].label}
-          <span className="hidden text-xs font-normal opacity-70 sm:block">{LAYERS[id].hint} · {LAYERS[id].legend.unit}</span>
+          {layer === id && <span className="mt-1 hidden text-xs font-normal opacity-80 sm:block">{LAYERS[id].hint} · {LAYERS[id].legend.unit}</span>}
         </button>
       ))}
-      <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10 sm:px-3">
+      <label className="ui-button ui-muted flex shrink-0 items-center gap-2 px-3 py-2 text-sm sm:mt-1 sm:border-t sm:border-[var(--border)]">
         <input type="checkbox" checked={showStations} onChange={actions.toggleStations} className="accent-sky-400" />
-        <span>Stations</span>
+        <span>Stations<span className="hidden text-[11px] sm:block">Visible when zoomed in</span></span>
       </label>
     </nav>
   )

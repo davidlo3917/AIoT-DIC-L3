@@ -24,7 +24,7 @@ async function decode(url: string, width: number, height: number, offset: number
   // premultiplyAlpha 'none' + no colour conversion: the bytes ARE the data, any "helpful" adjustment corrupts it.
   const bitmap = await createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
   const ctx = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true })!
-  ctx.drawImage(bitmap, 0, 0)
+  try { ctx.drawImage(bitmap, 0, 0) } finally { bitmap.close() }
   const px = ctx.getImageData(0, 0, width, height).data
   const values = new Float32Array(width * height)
   for (let i = 0; i < values.length; i++) values[i] = px[i * 4 + 3] ? ((px[i * 4] << 8) | px[i * 4 + 1]) / scale - offset : NaN

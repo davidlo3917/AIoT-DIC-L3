@@ -8,26 +8,44 @@ const FIELD: Record<Variable, keyof Observation> = { temperature: 'temperature',
 export function addStationLayers(map: MapLibreMap, onSelect: (stationId: number | null) => void) {
   map.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
   map.addLayer({
-    id: DOTS, type: 'circle', source: SOURCE,
+    id: DOTS, type: 'circle', source: SOURCE, minzoom: 8,
+    layout: { visibility: 'none' },
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 2.5, 9, 5, 12, 8],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 10, 1.5],
       'circle-stroke-color': '#0b1220',
       'circle-color': '#ffffff',
-      // At island scale ~850 dots would bury the surface they sit on; they fade in as you zoom toward a region.
-      'circle-opacity': ['interpolate', ['linear'], ['zoom'], 7.2, 0, 8, 1],
-      'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 7.2, 0, 8, 1],
+      // The minzoom also prevents invisible dots from intercepting island-scale clicks.
+      'circle-opacity': 1,
+      'circle-stroke-opacity': 1,
     },
   })
   map.addLayer({
     id: LABELS, type: 'symbol', source: SOURCE, minzoom: 9,
-    layout: { 'text-field': ['get', 'label'], 'text-size': 11, 'text-offset': [0, -1.2], 'text-font': ['Noto Sans Regular'] },
+    layout: { visibility: 'none', 'text-field': ['get', 'label'], 'text-size': 11, 'text-offset': [0, -1.2], 'text-font': ['Noto Sans Regular'] },
     paint: { 'text-color': '#f1f5f9', 'text-halo-color': '#0b1220', 'text-halo-width': 1.4 },
   })
-  map.on('click', DOTS, (e) => onSelect(Number(e.features?.[0]?.properties?.id)))
-  map.on('click', (e) => { if (!map.queryRenderedFeatures(e.point, { layers: [DOTS] }).length) onSelect(null) })
-  map.on('mouseenter', DOTS, () => (map.getCanvas().style.cursor = 'pointer'))
-  map.on('mouseleave', DOTS, () => (map.getCanvas().style.cursor = ''))
+  const click = (e: import('maplibre-gl').MapMouseEvent) => {
+    const feature = map.queryRenderedFeatures(e.point, { layers: [DOTS] })[0]
+    onSelect(feature ? Number(feature.properties.id) : null)
+  }
+  const enter = () => { map.getCanvas().style.cursor = 'pointer' }
+  const leave = () => { map.getCanvas().style.cursor = '' }
+  map.on('click', click)
+  map.on('mouseenter', DOTS, enter)
+  map.on('mouseleave', DOTS, leave)
+  return () => {
+    map.off('click', click)
+    map.off('mouseenter', DOTS, enter)
+    map.off('mouseleave', DOTS, leave)
+    for (const id of [LABELS, DOTS]) if (map.getLayer(id)) map.removeLayer(id)
+    if (map.getSource(SOURCE)) map.removeSource(SOURCE)
+  }
+}
+
+export function setStationsVisible(map: MapLibreMap, visible: boolean) {
+  for (const id of [DOTS, LABELS]) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
+  if (!visible) map.getCanvas().style.cursor = ''
 }
 
 /** Only stations that have a reading for the active variable are drawn — a rain gauge has no temperature to show. */
@@ -46,5 +64,5 @@ export function updateStations(map: MapLibreMap, stations: Station[], observatio
   // Dry gauges would bury the map in dots; for rain only show where it is actually raining.
   map.setFilter(DOTS, variable === 'rain' ? ['>=', ['get', 'value'], 0.5] : null)
   map.setFilter(LABELS, variable === 'rain' ? ['>=', ['get', 'value'], 0.5] : null)
-  for (const id of [DOTS, LABELS]) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
+  setStationsVisible(map, visible)
 }

@@ -4,16 +4,12 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useEffect, useRef, useState } from 'react'
 import type { Station } from '../api'
 import { useWeather } from './useWeather'
+import { weatherBasemap } from './basemap'
 
 setWorkerUrl(workerUrl)
 
-// OpenFreeMap "fiord" with land and sea pushed apart: stock dark styles put the coastline at ~3% contrast,
-// which vanishes on a real screen. Dark enough for radar/particle overlays, light enough to read the island.
+// Reuse the provider's sources and place filters; basemap.ts selects and restyles only weather-relevant context.
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/fiord'
-const BASEMAP_PAINT: Record<string, Record<string, string>> = {
-  background: { 'background-color': '#4a5a78' }, // land
-  water: { 'fill-color': '#141d2f' },
-}
 
 // Taiwan + surrounding sea; matches the radar/wind crop so layers never end mid-screen at min zoom.
 const BOUNDS: [number, number, number, number] = [115, 17.75, 126.5, 29.25]
@@ -32,10 +28,7 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
       attributionControl: false, // added below, top-right: the default bottom corner sits under the timeline
     })
     m.setStyle(STYLE_URL, {
-      transformStyle: (_, next) => ({
-        ...next,
-        layers: next.layers.map((l) => (BASEMAP_PAINT[l.id] ? { ...l, paint: { ...l.paint, ...BASEMAP_PAINT[l.id] } } as typeof l : l)),
-      }),
+      transformStyle: (_, next) => weatherBasemap(next),
     })
     m.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     m.addControl(new AttributionControl({ compact: true }), 'top-right')

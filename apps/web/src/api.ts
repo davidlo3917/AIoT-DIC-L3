@@ -17,6 +17,7 @@ export const getFrames = (layer: FrameLayer, signal?: AbortSignal) => get<{ fram
 // One request per instant, shared by the station dots, the humidity surface and the playback preloader. Not abortable:
 // the server runs an abandoned query to the end anyway, so aborting only threw away an answer replay would want.
 const observations = new Map<string, Promise<Observation[]>>()
+export const invalidateObservations = () => observations.clear()
 export function getObservations(at: string): Promise<Observation[]> {
   let hit = observations.get(at)
   if (!hit) {
@@ -24,7 +25,9 @@ export function getObservations(at: string): Promise<Observation[]> {
     observations.set(at, hit)
     // Stations keep reporting for a while after the instant itself (CWA publishes ~15 min late): only the settled past is kept.
     const settled = Date.now() - Date.parse(at) > 30 * 60e3
-    hit.then(() => settled || observations.delete(at), () => observations.delete(at))
+    const current = hit
+    const drop = () => { if (observations.get(at) === current) observations.delete(at) }
+    hit.then((rows) => { if (!settled || !rows.length) drop() }, drop)
     if (observations.size > 60) observations.delete(observations.keys().next().value!)
   }
   return hit
