@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { z } from 'zod'
 import { db } from '../db/client.js'
+import { publicUrl } from '../lib/storage.js'
 import { stationObservations as obs, stations, weatherFrames } from '../db/schema.js'
 import { atQuery, layerQuery, rangeQuery, stationIdParam } from './query.js'
 
@@ -26,7 +27,7 @@ function readingsAt(at: Date, stationId?: number) {
     group by station_id`)
 }
 
-const parse = <S extends z.ZodType>(schema: S, input: unknown, what = 'query'): z.output<S> => {
+export const parse = <S extends z.ZodType>(schema: S, input: unknown, what = 'query'): z.output<S> => {
   const r = schema.safeParse(input)
   if (r.success) return r.data
   const error = r.error.issues.map((i) => `${i.path.join('.') || what}: ${i.message}`).join('; ')
@@ -97,13 +98,12 @@ export const publicRoutes = new Hono()
       return c.json({ layer, frames })
     }
 
-    const base = `${process.env.SUPABASE_URL}/storage/v1/object/public/${process.env.SUPABASE_STORAGE_BUCKET}/`
     const rows = await db.select().from(weatherFrames)
       .where(and(eq(weatherFrames.layerType, layer), between(weatherFrames.validAt, from, to))).orderBy(asc(weatherFrames.validAt), desc(weatherFrames.issuedAt))
     return c.json({
       layer,
       frames: rows.map((f) => ({
-        time: f.validAt.toISOString(), url: base + f.storagePath, issuedAt: f.issuedAt?.toISOString() ?? null,
+        time: f.validAt.toISOString(), url: publicUrl(f.storagePath), issuedAt: f.issuedAt?.toISOString() ?? null,
         bounds: [f.minLon, f.minLat, f.maxLon, f.maxLat], meta: f.metadataJson,
       })),
     })

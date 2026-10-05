@@ -2,28 +2,22 @@ import { z } from 'zod'
 
 const BASE = 'https://opendata.cwa.gov.tw'
 
-/** REST "datastore" datasets (stations, forecasts, warnings, typhoons). Grids/imagery use the file API instead. */
-export async function fetchDatastore(datasetId: string): Promise<unknown> {
+/** Every CWA endpoint takes the key as a query parameter, so no error may ever include the URL. */
+async function cwa(path: string, what: string, ms: number, query = '') {
   const key = process.env.CWA_API_KEY
   if (!key) throw new Error('CWA_API_KEY is not set')
-  const res = await fetch(`${BASE}/api/v1/rest/datastore/${datasetId}?Authorization=${encodeURIComponent(key)}`, {
-    signal: AbortSignal.timeout(30_000),
-  })
-  // Never include the URL in errors: it carries the API key.
-  if (!res.ok) throw new Error(`CWA ${datasetId} responded ${res.status}`)
-  return res.json()
+  const res = await fetch(`${BASE}${path}?Authorization=${encodeURIComponent(key)}${query}`, { signal: AbortSignal.timeout(ms) })
+  if (!res.ok) throw new Error(`CWA ${what} responded ${res.status}`)
+  return res
 }
 
+/** REST "datastore" datasets (stations, forecasts, warnings, typhoons). Grids/imagery use the file API instead. */
+export const fetchDatastore = async (datasetId: string): Promise<unknown> =>
+  (await cwa(`/api/v1/rest/datastore/${datasetId}`, datasetId, 30_000)).json()
+
 /** File-API datasets (grids, radar, satellite): the endpoint 302s to a JSON document on CWA's public S3. */
-export async function fetchFileApi(datasetId: string): Promise<any> {
-  const key = process.env.CWA_API_KEY
-  if (!key) throw new Error('CWA_API_KEY is not set')
-  const res = await fetch(`${BASE}/fileapi/v1/opendataapi/${datasetId}?Authorization=${encodeURIComponent(key)}&downloadType=WEB&format=JSON`, {
-    signal: AbortSignal.timeout(45_000),
-  })
-  if (!res.ok) throw new Error(`CWA file ${datasetId} responded ${res.status}`) // no URL: it carries the key
-  return res.json()
-}
+export const fetchFileApi = async (datasetId: string): Promise<any> =>
+  (await cwa(`/fileapi/v1/opendataapi/${datasetId}`, `file ${datasetId}`, 45_000, '&downloadType=WEB&format=JSON')).json()
 
 // ---- history API: past files, for backfilling. Only three datasets have one (`/historyapi/v1/getDataId`):
 // O-A0001-001 (hourly snapshots, 24 h), O-A0002-001 (~1 h) and O-A0059-001 (radar grid, 10 days). Files are XML only.
@@ -34,21 +28,14 @@ const historyList = z.object({ dataset: z.object({ resources: z.object({ resourc
 
 /** Instants CWA still holds for a dataset, newest first. */
 export async function fetchHistoryTimes(datasetId: string): Promise<string[]> {
-  const key = process.env.CWA_API_KEY
-  if (!key) throw new Error('CWA_API_KEY is not set')
-  const res = await fetch(`${BASE}/historyapi/v1/getMetadata/${datasetId}?Authorization=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(30_000) })
-  if (!res.ok) throw new Error(`CWA history list ${datasetId} responded ${res.status}`) // no URL: it carries the key
+  const res = await cwa(`/historyapi/v1/getMetadata/${datasetId}`, `history list ${datasetId}`, 30_000)
   return historyList.parse(await res.json()).dataset.resources.resource.data.time.map((t) => t.DateTime).sort().reverse()
 }
 
 /** One past file, as XML text. The URL is built from the (validated) timestamp rather than taken from CWA's listing. */
 export async function fetchHistoryFile(datasetId: string, dateTime: string): Promise<string> {
-  const key = process.env.CWA_API_KEY
-  if (!key) throw new Error('CWA_API_KEY is not set')
   const path = dateTime.slice(0, 19).replace(/[-T:]/g, '/') // 2026-09-21T02:00:00+08:00 → 2026/09/21/02/00/00
-  const res = await fetch(`${BASE}/historyapi/v1/getData/${datasetId}/${path}?Authorization=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(45_000) })
-  if (!res.ok) throw new Error(`CWA history file ${datasetId} ${dateTime} responded ${res.status}`)
-  return res.text()
+  return (await cwa(`/historyapi/v1/getData/${datasetId}/${path}`, `history file ${datasetId} ${dateTime}`, 45_000)).text()
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }

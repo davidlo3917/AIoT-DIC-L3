@@ -81,10 +81,9 @@ tasks:
       - curl -s -X POST -H "Authorization{{":"}} Bearer $INGESTION_SECRET" http://localhost:{{.API_PORT}}/api/internal/ingest/stations
 
   check:
-    desc: Everything CI runs — lint, typecheck, test, build
+    desc: Everything CI runs — typecheck, test, build
     deps: [install]
     cmds:
-      - pnpm lint
       - pnpm typecheck
       - pnpm test
       - pnpm build

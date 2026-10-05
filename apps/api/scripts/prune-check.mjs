@@ -20,12 +20,16 @@ try {
     }
     for (const [label, [age, minute]] of Object.entries(cases))
       await tx`insert into station_observations (station_id, observed_at, temperature) values (${id}, date_trunc('hour', now() - ${age}::interval) + make_interval(mins => ${minute}), ${Object.keys(cases).indexOf(label)})`
-    const before = (await tx`select count(*)::int n from station_observations where station_id <> ${id}`)[0].n
+    // Real rows the prune must keep. Counting every real row only passes right after the nightly prune: later in
+    // the day, 10-minute readings that have just aged past the fine window are thinned here too, and rightly so.
+    const kept = async () => (await tx`select count(*)::int n from station_observations where station_id <> ${id}
+      and observed_at >= now() - interval '60 days' and (observed_at >= now() - interval '3 days' or extract(minute from observed_at) = 0)`)[0].n
+    const before = await kept()
 
     const [{ r }] = await tx`select private.prune(interval '3 days', interval '60 days') as r`
     const left = new Set((await tx`select temperature::int t from station_observations where station_id = ${id}`).map((x) => x.t))
     Object.entries(cases).forEach(([label, [, , survives]], i) => { assert.equal(left.has(i), survives, label); console.log('ok  ', label) })
-    assert.equal((await tx`select count(*)::int n from station_observations where station_id <> ${id}`)[0].n, before, 'real rows inside the windows must be untouched')
+    assert.equal(await kept(), before, 'real rows inside the windows must be untouched')
     console.log('ok   real rows untouched (', before, ')')
     assert.ok(r.expired >= 1 && r.thinned >= 1 && r.db_bytes > 0, JSON.stringify(r)); console.log('ok   size log row:', JSON.stringify(r))
     await assert.rejects(tx.savepoint((s) => s`select private.prune(interval '3 days', interval '1 day')`), /0 < fine < hourly/); console.log('ok   refuses inverted windows')

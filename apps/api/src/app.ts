@@ -5,7 +5,7 @@ import { db } from './db/client.js'
 import { ingestGrids, pruneFrames } from './ingestion/grids.js'
 import { backfillStations, ingestStations } from './ingestion/stations.js'
 import { ingestAuth } from './middleware/ingestAuth.js'
-import { publicRoutes } from './routes/public.js'
+import { parse, publicRoutes } from './routes/public.js'
 import { backfillQuery, gridsQuery } from './routes/query.js'
 
 const app = new Hono().basePath('/api')
@@ -22,14 +22,8 @@ const app = new Hono().basePath('/api')
   .use('/internal/*', ingestAuth)
   .post('/internal/ingest/stations', async (c) => c.json(await ingestStations()))
   // Grids *and* radar imagery: one cron job fetches everything, a second asks for `?layer=radar` alone.
-  .post('/internal/ingest/grids', async (c) => {
-    const q = gridsQuery.safeParse(c.req.query())
-    return q.success ? c.json(await ingestGrids(q.data.layer)) : c.json({ error: q.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }, 400)
-  })
-  .post('/internal/backfill/stations', async (c) => {
-    const q = backfillQuery.safeParse(c.req.query())
-    return q.success ? c.json(await backfillStations(q.data)) : c.json({ error: q.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }, 400)
-  })
+  .post('/internal/ingest/grids', async (c) => c.json(await ingestGrids(parse(gridsQuery, c.req.query()).layer)))
+  .post('/internal/backfill/stations', async (c) => c.json(await backfillStations(parse(backfillQuery, c.req.query()))))
   .post('/internal/prune/frames', async (c) => c.json(await pruneFrames()))
 
 // Errors reach logs in full; clients get a generic body (CWA/DB messages can carry internals).

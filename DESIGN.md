@@ -806,7 +806,6 @@ Recommended GitHub Actions workflow:
 Pull Request / Push
 
 pnpm install
-pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build

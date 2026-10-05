@@ -6,7 +6,6 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit",
     "test": "node --import tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {

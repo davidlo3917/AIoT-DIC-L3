@@ -61,20 +61,16 @@ export default function StationCard({ stations }: { stations: Station[] }) {
       <p className="ui-muted mb-2 text-xs">{frame ? t('station.asOf', { time: dayTime.format(new Date(frame.time)) }) : t('station.noTime')}</p>
       {frame && !current && <p className="ui-muted py-2 text-xs" role="status">{t('station.loading')}</p>}
       {current && !current.value && <p className="py-2 text-xs text-amber-200" role="status">{t(current.error ? 'station.failed' : 'station.none')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>}
-      {(
-        <>
-          <dl className="mb-2 grid grid-cols-3 gap-x-2 gap-y-1.5 text-xs">
-            {[[t('station.temp'), num('temperature'), '°C'], [t('station.humidity'), num('humidity', 0), '%'], [t('station.pressure'), num('pressure'), 'hPa'],
-              [t('station.wind'), num('windSpeed'), `m/s ${dir == null ? '' : compass[Math.round(dir / 45) % 8]}`], [t('station.rain1h'), num('rain1h'), 'mm'], [t('station.rain24h'), num('rain24h'), 'mm']].map(([k, v, u]) => (
-              <div key={k}><dt className="text-slate-400">{k}</dt><dd className="tabular-nums"><span className="text-sm font-medium">{v}</span> <span className="text-slate-400">{u}</span></dd></div>
-            ))}
-          </dl>
-          <h3 className="mb-0.5 text-xs text-slate-400">{t('station.chart', { name: t(`var.${variable}`) })}</h3>
-          {rows === null ? <p className="ui-muted py-3 text-xs">{t('station.history.loading')}</p> : rows === 'error'
-            ? <p className="text-xs text-amber-200">{t('station.history.failed')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>
-            : <Sparkline points={points} unit={ramp.unit} bars={variable === 'rain'} format={ramp.format} selectedTime={frame?.time} />}
-        </>
-      )}
+      <dl className="mb-2 grid grid-cols-3 gap-x-2 gap-y-1.5 text-xs">
+        {[[t('station.temp'), num('temperature'), '°C'], [t('station.humidity'), num('humidity', 0), '%'], [t('station.pressure'), num('pressure'), 'hPa'],
+          [t('station.wind'), num('windSpeed'), `m/s ${dir == null ? '' : compass[Math.round(dir / 45) % 8]}`], [t('station.rain1h'), num('rain1h'), 'mm'], [t('station.rain24h'), num('rain24h'), 'mm']].map(([k, v, u]) => (
+          <div key={k}><dt className="text-slate-400">{k}</dt><dd className="tabular-nums"><span className="text-sm font-medium">{v}</span> <span className="text-slate-400">{u}</span></dd></div>
+        ))}
+      </dl>
+      <h3 className="mb-0.5 text-xs text-slate-400">{t('station.chart', { name: t(`var.${variable}`) })}</h3>
+      {rows === null ? <p className="ui-muted py-3 text-xs">{t('station.history.loading')}</p> : rows === 'error'
+        ? <p className="text-xs text-amber-200">{t('station.history.failed')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>
+        : <Sparkline points={points} unit={ramp.unit} bars={variable === 'rain'} format={ramp.format} selectedTime={frame?.time} />}
     </aside>
   )
 }
