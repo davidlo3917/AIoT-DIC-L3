@@ -6,7 +6,7 @@ const wanted = { api_base_url: process.env.API_BASE_URL?.replace(/\/+$/, ''), in
 for (const [name, value] of Object.entries(wanted)) if (!value) throw new Error(`${name}: missing in .env (${name.toUpperCase()})`)
 if (!/^https:\/\//.test(wanted.api_base_url)) throw new Error('API_BASE_URL must be https:// — the bearer token travels in this request')
 
-const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 })
+const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1, ssl: 'require' })
 for (const [name, value] of Object.entries(wanted)) {
   const [existing] = await sql`select id from vault.secrets where name = ${name}`
   if (existing) await sql`select vault.update_secret(${existing.id}::uuid, ${value})`

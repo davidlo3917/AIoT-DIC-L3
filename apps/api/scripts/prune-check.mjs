@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import postgres from 'postgres'
 
-const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1, onnotice: () => {} })
+const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1, ssl: 'require', onnotice: () => {} })
 const ROLLBACK = new Error('rollback')
 try {
   await sql.begin(async (tx) => {
