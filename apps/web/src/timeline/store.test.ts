@@ -92,6 +92,13 @@ test('Play from the newest frame replays the layer\'s recent loop; from elsewher
   assert.equal(store.getSnapshot().playing, true)
 })
 
+test('the language defaults to Chinese and switches', () => {
+  const store = createTimelineStore()
+  assert.equal(store.getSnapshot().lang, 'zh-Hant')
+  store.actions.setLang('en')
+  assert.equal(store.getSnapshot().lang, 'en')
+})
+
 test('stations are opt-in and hiding them clears selection', () => {
   const store = createTimelineStore()
   assert.equal(store.getSnapshot().showStations, false)

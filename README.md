@@ -4,7 +4,10 @@ Windy-style weather map for Taiwan on CWA Open Data. Design: [DESIGN.md](DESIGN.
 
 ## Map controls
 
-The dark basemap keeps coastlines, boundaries, and Chinese-first city names. Main roads appear at zoom 9;
+The interface is in Traditional Chinese by default; the **English** button in the header switches language (中文 switches
+back) and the choice is remembered in the browser. Station and town names are CWA's and stay Chinese.
+
+The dark basemap keeps coastlines, boundaries, and city names in the chosen language. Main roads appear at zoom 9;
 buildings, minor roads, railways, and land-use textures are omitted. Temperature, rain, radar, and humidity remain available.
 
 Stations are off by default; enable **Stations** and zoom in (dots at zoom 8, values at zoom 9) to select a station.

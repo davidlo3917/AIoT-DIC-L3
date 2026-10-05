@@ -1,27 +1,30 @@
+import { useT } from '../i18n'
 import { LAYERS, type LayerId } from '../layers'
 import { actions, useStore } from '../timeline/store'
 
 /** Lives in the sidebar on roomy screens and beside the legend on compact ones, where the layer row has no room for it. */
 export function StationsToggle({ className }: { className: string }) {
+  const { t } = useT()
   const showStations = useStore((s) => s.showStations)
   return (
-    <label className={`ui-button ui-muted shrink-0 items-center gap-2 px-3 text-sm ${className}`} title="Visible when zoomed in">
+    <label className={`ui-button ui-muted shrink-0 items-center gap-2 px-3 text-sm ${className}`} title={t('stations.title')}>
       <input type="checkbox" checked={showStations} onChange={actions.toggleStations} className="accent-sky-400" />
-      <span>Stations<span className="hidden text-[11px] sm:inline"> · zoom in</span></span>
+      <span>{t('stations.toggle')}<span className="hidden text-[11px] sm:inline"> · {t('stations.zoomHint')}</span></span>
     </label>
   )
 }
 
 export default function LayerPanel() {
+  const { t } = useT()
   const layer = useStore((s) => s.layer)
   return (
-    <nav aria-label="Weather layers" className="weather-panel pointer-events-auto flex gap-1 overflow-x-auto p-1 desk:w-44 desk:flex-col desk:overflow-y-auto">
+    <nav aria-label={t('layers.label')} className="weather-panel pointer-events-auto flex gap-1 overflow-x-auto p-1 desk:w-44 desk:flex-col desk:overflow-y-auto">
       {(Object.keys(LAYERS) as LayerId[]).map((id) => (
-        <button key={id} type="button" aria-pressed={layer === id} onClick={() => actions.setLayer(id)} title={LAYERS[id].hint}
+        <button key={id} type="button" aria-pressed={layer === id} onClick={() => actions.setLayer(id)} title={t(`layer.${id}.hint`)}
           // Compact row: four buttons share a phone's width (tight enough for 360 px in English), and the active one
           // keeps its weight so none of them moves.
           className={`ui-button shrink-0 grow px-1.5 py-2 text-center text-[13px] transition-colors sm:px-3 sm:text-sm desk:grow-0 desk:text-left ${layer === id ? 'ui-active desk:font-semibold' : 'ui-muted'}`}>
-          {LAYERS[id].label}
+          {t(`layer.${id}`)}
         </button>
       ))}
       <StationsToggle className="hidden desk:mt-1 desk:flex desk:border-t desk:border-[var(--border)]" />

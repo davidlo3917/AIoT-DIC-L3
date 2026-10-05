@@ -1,17 +1,23 @@
 import { useSyncExternalStore } from 'react'
 import type { Frame } from '../api'
 import { invalidateObservations } from '../api'
+import type { Lang } from '../i18n'
 import { LAYERS, type LayerId } from '../layers'
 
 export type LoadState = 'loading' | 'ready' | 'empty' | 'error'
 type State = { layer: LayerId; showStations: boolean; frames: Frame[]; index: number; playing: boolean; speed: number;
-  selectedStation: number | null; followLatest: boolean; loadState: LoadState; refreshKey: number; cursorTime: string | null }
+  selectedStation: number | null; followLatest: boolean; loadState: LoadState; refreshKey: number; cursorTime: string | null; lang: Lang }
+// The reader's choice of language outlives the tab. No storage (Node tests, a locked-down browser) just means the default.
+const savedLang = (): Lang => {
+  try { if (localStorage.getItem('lang') === 'en') return 'en' } catch { /* unavailable */ }
+  return 'zh-Hant'
+}
 export const currentFrame = (s: State): Frame | undefined => s.frames[s.index]
 
 /** Independent instances make out-of-order requests and playback testable without a browser. */
 export function createTimelineStore() {
   let state: State = { layer: 'temperature', showStations: false, frames: [], index: -1, playing: false, speed: 1,
-    selectedStation: null, followLatest: true, loadState: 'loading', refreshKey: 0, cursorTime: null }
+    selectedStation: null, followLatest: true, loadState: 'loading', refreshKey: 0, cursorTime: null, lang: savedLang() }
   let request = 0
   const listeners = new Set<() => void>()
   const set = (patch: Partial<State>) => { state = { ...state, ...patch }; listeners.forEach((l) => l()) }
@@ -20,6 +26,10 @@ export function createTimelineStore() {
       if (layer === state.layer) return
       request++
       set({ layer, frames: [], index: -1, playing: false, loadState: 'loading', cursorTime: currentFrame(state)?.time ?? state.cursorTime })
+    },
+    setLang(lang: Lang) {
+      try { localStorage.setItem('lang', lang) } catch { /* still switches for this visit */ }
+      set({ lang })
     },
     toggleStations() { set({ showStations: !state.showStations, selectedStation: null }) },
     selectStation(selectedStation: number | null) { set({ selectedStation }) },

@@ -2,6 +2,7 @@ import type { CanvasSource, Map as MapLibreMap } from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 import { getFrames, getObservations, type Frame, type Station } from '../api'
 import { LAYERS } from '../layers'
+import { STATUS, type Status } from '../status'
 import { actions, currentFrame, useStore } from '../timeline/store'
 import { loadField, loadImage, paint, type Field } from './layers/grid'
 import { idw } from './layers/idw'
@@ -23,8 +24,8 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   const showStations = useStore((s) => s.showStations)
   const playing = useStore((s) => s.playing), speed = useStore((s) => s.speed)
   const frame = useStore(currentFrame)
-  const [status, setStatus] = useState<string | null>(null)
-  const [stationStatus, setStationStatus] = useState<string | null>(null)
+  const [status, setStatus] = useState<Status>(null)
+  const [stationStatus, setStationStatus] = useState<Status>(null)
   const refreshKey = useStore((s) => s.refreshKey)
   const [shown, setShown] = useState<Frame | null>(null) // the frame that is actually on the map
   // One layer of constant opacity; frames blend old→new INSIDE its canvas (DESIGN §13). Crossfading two map layers
@@ -103,7 +104,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     since.current = performance.now()
     const s = surface
     setStatus(null)
-    const loading = setTimeout(() => { if (alive) setStatus('Loading weather…') }, 250)
+    const loading = setTimeout(() => { if (alive) setStatus(STATUS.loadingWeather) }, 250)
 
     /** Blend from whatever is on screen (even a half-finished blend) to `next`. A different size or place is a cut. */
     const show = (next: HTMLCanvasElement | OffscreenCanvas, bounds: Field['bounds']) => new Promise<void>((resolve) => {
@@ -156,7 +157,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
           if (!mask) {
             map.setPaintProperty(SURFACE, 'raster-opacity', 0)
             s.bounds = ''
-            return setStatus('Humidity is not available yet')
+            return setStatus(STATUS.noHumidity)
           }
           const byId = new Map(stations.map((s) => [s.id, s]))
           const points = obs.flatMap((o) => { const s = byId.get(o.stationId), v = o.humidity; return s && v != null ? [{ lon: s.longitude, lat: s.latitude, value: v }] : [] })
@@ -175,7 +176,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
         if (!alive) return
         map.setPaintProperty(SURFACE, 'raster-opacity', 0)
         s.bounds = '' // the next good frame cuts in instead of blending from a picture nobody saw
-        setStatus('No data for this time')
+        setStatus(STATUS.noData)
       } finally { clearTimeout(loading); if (alive) setShown(frame) } // a hole in the data must not stall playback either
     })()
     return () => {
@@ -205,8 +206,8 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     getObservations(frame.time).then((obs) => {
       if (!alive) return
       updateStations(map, stations, obs, layer.stations, true)
-      if (!obs.length) setStationStatus('No station readings for this time')
-    }, () => { if (alive) setStationStatus('Could not load station readings') })
+      if (!obs.length) setStationStatus(STATUS.noStationReadings)
+    }, () => { if (alive) setStationStatus(STATUS.stationReadingsFailed) })
     return () => { alive = false }
   }, [map, frame, layer.stations, stations, showStations, refreshKey])
 

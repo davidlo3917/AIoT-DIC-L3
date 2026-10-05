@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createExpression, validateStyleMin } from '@maplibre/maplibre-gl-style-spec'
 import type { StyleSpecification } from 'maplibre-gl'
-import { MAP_COLORS, PLACE_NAME, REFERENCE_LAYER, weatherBasemap } from './basemap'
+import { MAP_COLORS, placeName, REFERENCE_LAYER, weatherBasemap } from './basemap'
 
 const fixture: StyleSpecification = {
   version: 8, glyphs: 'https://example.test/fonts/{fontstack}/{range}.pbf',
@@ -20,7 +20,7 @@ const fixture: StyleSpecification = {
 }
 
 test('weather style is valid, removes clutter, and preserves the mask and references in order', () => {
-  const style = weatherBasemap(fixture)
+  const style = weatherBasemap(fixture, 'zh-Hant')
   assert.deepEqual(validateStyleMin(style), [])
   assert.deepEqual(style.layers.map((l) => l.id), ['background', 'water', REFERENCE_LAYER, 'boundary_state', 'place_city_large', 'place_city', 'place_town'])
   assert.deepEqual(style.sources, fixture.sources, 'retain attribution and tile sources')
@@ -34,14 +34,27 @@ test('weather style is valid, removes clutter, and preserves the mask and refere
   assert.equal(fixture.layers.length, 15, 'does not modify its input')
 })
 
-test('Chinese labels fall back without duplicate bilingual lines or blank-name failures', () => {
-  const expression = createExpression(PLACE_NAME, 'text-field')
+const evaluator = (lang: 'zh-Hant' | 'en') => {
+  const expression = createExpression(placeName(lang), 'text-field')
   assert.equal(expression.result, 'success')
-  if (expression.result !== 'success') return
-  const name = (properties: Record<string, string>) => expression.value.evaluate({ zoom: 7 }, { type: 'Point', properties })
+  if (expression.result !== 'success') throw new Error('place name expression did not compile')
+  return (properties: Record<string, string>) => expression.value.evaluate({ zoom: 7 }, { type: 'Point', properties })
+}
+
+test('Chinese labels fall back without duplicate bilingual lines or blank-name failures', () => {
+  const name = evaluator('zh-Hant')
   assert.equal(name({ 'name:zh-Hant': '臺中', 'name:zh': '台中', name: 'Taichung' }), '臺中')
   assert.equal(name({ 'name:zh-Hant': '', 'name:nonlatin': '臺北', name: 'Taipei' }), '臺北')
   assert.equal(name({ name: 'Tokyo', 'name:en': 'Tokyo' }), 'Tokyo')
   assert.equal(name({ 'name:en': 'London' }), 'London')
+  assert.equal(name({}), '')
+})
+
+test('English labels prefer the English name and still label places that have none', () => {
+  const name = evaluator('en')
+  assert.equal(name({ 'name:zh-Hant': '臺中', name: '臺中市', 'name:en': 'Taichung' }), 'Taichung')
+  assert.equal(name({ name: '臺北市', name_en: 'Taipei', 'name:latin': 'Taibei' }), 'Taipei')
+  assert.equal(name({ name: '新竹', 'name:latin': 'Hsinchu', 'name:nonlatin': '新竹' }), 'Hsinchu')
+  assert.equal(name({ name: '某村', 'name:nonlatin': '某村' }), '某村')
   assert.equal(name({}), '')
 })
