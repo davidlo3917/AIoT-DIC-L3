@@ -78,6 +78,20 @@ test('playback starts at the beginning and resumes latest-following after comple
   assert.equal(store.getSnapshot().followLatest, true)
 })
 
+test('Play from the newest frame replays the layer\'s recent loop; from elsewhere it keeps its place', () => {
+  const every10 = (n: number): Frame[] => Array.from({ length: n }, (_, i) => ({ time: new Date(Date.UTC(2026, 8, 22, 0, i * 10)).toISOString() }))
+  const store = createTimelineStore(), a = store.actions
+  a.setLayer('radar'); load(store, every10(145)); a.toggle() // 24 h of radar: loop is the last 3 h = 18 frames back
+  assert.equal(store.getSnapshot().index, 126)
+  a.toggle(); a.seek(50); a.toggle()
+  assert.equal(store.getSnapshot().index, 50)
+  a.setLayer('temperature'); load(store, frames(...Array.from({ length: 25 }, (_, h) => h))); a.latest(); a.toggle() // hourly: the whole day
+  assert.equal(store.getSnapshot().index, 0)
+  a.setLayer('rain'); load(store, frames(1, 2, 12)); a.latest(); a.toggle() // a gap: only the newest frame is inside the loop
+  assert.equal(store.getSnapshot().index, 1, 'still one step back, so Play has something to play')
+  assert.equal(store.getSnapshot().playing, true)
+})
+
 test('stations are opt-in and hiding them clears selection', () => {
   const store = createTimelineStore()
   assert.equal(store.getSnapshot().showStations, false)

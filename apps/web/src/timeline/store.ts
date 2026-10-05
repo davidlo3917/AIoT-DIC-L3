@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { Frame } from '../api'
 import { invalidateObservations } from '../api'
-import type { LayerId } from '../layers'
+import { LAYERS, type LayerId } from '../layers'
 
 export type LoadState = 'loading' | 'ready' | 'empty' | 'error'
 type State = { layer: LayerId; showStations: boolean; frames: Frame[]; index: number; playing: boolean; speed: number;
@@ -53,7 +53,14 @@ export function createTimelineStore() {
     setSpeed(speed: number) { set({ speed }) },
     toggle() {
       if (state.frames.length < 2) return
-      set({ playing: !state.playing, followLatest: false, index: !state.playing && state.index >= state.frames.length - 1 ? 0 : state.index })
+      let index = state.index
+      if (!state.playing && index >= state.frames.length - 1) {
+        // From the newest frame, Play replays the layer's recent loop rather than the whole day (24 h of 10-minute
+        // frames takes 99 s). At least one step back, so there is always something to play.
+        const from = Date.parse(state.frames[index].time) - LAYERS[state.layer].loop * 3600e3
+        index = Math.min(state.frames.length - 2, state.frames.findIndex((f) => Date.parse(f.time) >= from))
+      }
+      set({ playing: !state.playing, followLatest: false, index })
     },
     tick() {
       if (!state.frames.length) return

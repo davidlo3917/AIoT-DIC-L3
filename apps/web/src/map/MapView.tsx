@@ -40,7 +40,8 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
   }, [])
 
   const status = useWeather(map, stations)
-  useEffect(() => onStatus(status), [status, onStatus])
+  // Until the map exists the timeline may already be loaded; say why there is no weather to see yet.
+  useEffect(() => onStatus(map ? status : 'Loading map…'), [map, status, onStatus])
 
   // Sized wrapper: maplibre-gl.css sets `.maplibregl-map { position: relative }`, which would override `absolute` on the map node itself.
   return <div className="absolute inset-0"><div ref={el} className="h-full w-full" /></div>

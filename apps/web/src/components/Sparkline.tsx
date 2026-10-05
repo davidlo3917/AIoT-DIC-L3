@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { weekdayTime } from '../format'
 import { chartExtent } from './chartData'
 
 type Point = { t: number; v: number }
@@ -34,8 +35,8 @@ export default function Sparkline({ points, unit, bars, format, selectedTime }: 
         {h && <line x1={x(h.t)} x2={x(h.t)} y1={PAD.t - 4} y2={H - PAD.b} stroke="currentColor" className="text-slate-400" strokeWidth="1" strokeDasharray="2 2" />}
         {h && !bars && <circle cx={x(h.t)} cy={y(h.v)} r="4" className="fill-sky-400 stroke-slate-900" strokeWidth="2" />}
         {selected >= t0 && selected <= t1 && <line x1={x(selected)} x2={x(selected)} y1={PAD.t - 4} y2={H - PAD.b} stroke="#e5edf7" strokeWidth="1.5" strokeDasharray="3 2"><title>Selected map time</title></line>}
-        <text x={PAD.l} y={H - 2} className="fill-slate-400 text-[9px]">{hhmm.format(t0)}</text>
-        <text x={W - PAD.r} y={H - 2} textAnchor="end" className="fill-slate-400 text-[9px]">{hhmm.format(t1)}</text>
+        <text x={PAD.l} y={H - 2} className="fill-slate-400 text-[9px]">{weekdayTime.format(t0)}</text>
+        <text x={W - PAD.r} y={H - 2} textAnchor="end" className="fill-slate-400 text-[9px]">{weekdayTime.format(t1)}</text>
       </svg>
       <div className="flex justify-between text-[11px] tabular-nums text-slate-400">
         <span>min {format(min)} · max {format(max)} {unit}</span>

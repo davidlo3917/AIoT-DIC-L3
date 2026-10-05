@@ -9,8 +9,11 @@ buildings, minor roads, railways, and land-use textures are omitted. Temperature
 
 Stations are off by default; enable **Stations** and zoom in (dots at zoom 8, values at zoom 9) to select a station.
 Its readings follow the selected map time, with a dashed time marker on the last-24-hour chart.
-The timeline initially follows new frames automatically. Scrubbing holds a historical time; **Latest**, or dragging the
-slider back to the newest frame, resumes following.
+The timeline initially follows new frames automatically and says how old the shown frame is. **Live** is lit while it
+follows; scrubbing holds a historical time, and **Back to latest**, or dragging the slider to the newest frame, resumes.
+**Play** from the newest frame replays the last 3 hours (the whole day for hourly Temperature); from anywhere else it
+plays on from there. Keyboard: Space plays or pauses, ← and → step one frame. A map reached with Tab keeps the arrow
+keys for panning.
 **Retry** reloads unavailable data. The legend says what the active layer shows (rain: past-hour accumulation in millimetres).
 
 Windows at least 640 px wide and tall get the layer sidebar. Anything smaller — a phone either way up — gets a row of
