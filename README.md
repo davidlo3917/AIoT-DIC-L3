@@ -1,69 +1,170 @@
-# Weather Taiwan
+# 臺灣天氣（Weather Taiwan）
 
-Windy-style weather map for Taiwan on CWA Open Data. Design: [DESIGN.md](DESIGN.md).
+以中央氣象署（CWA）開放資料製作的 Windy 風格臺灣天氣地圖：在地圖上看溫度、雨量、雷達回波與濕度，並可回放過去 24 小時。
 
-## Map controls
+- 線上版：<https://a-io-t-dic-l3.vercel.app>
+- 設計文件：[DESIGN.md](DESIGN.md)（英文）
 
-The interface is in Traditional Chinese by default; the **English** button in the header switches language (中文 switches
-back) and the choice is remembered in the browser. Station and town names are CWA's and stay Chinese.
+## 功能現況
 
-The dark basemap keeps coastlines, boundaries, and city names in the chosen language. Main roads appear at zoom 9;
-buildings, minor roads, railways, and land-use textures are omitted. Temperature, rain, radar, and humidity remain available.
+| 圖層 | 內容 | 資料來源 | 更新頻率 |
+|---|---|---|---|
+| 溫度 | 全臺氣溫格點（僅陸地） | CWA `O-A0038-003` | 每小時 |
+| 雨量 | 過去 1 小時累積雨量（雷達估計） | CWA `O-B0045-001` | 每 10 分鐘 |
+| 雷達 | 雷達合成回波圖 | CWA `O-A0058-005` | 每 10 分鐘 |
+| 濕度 | 相對濕度，由測站觀測值在瀏覽器內插而成 | 測站觀測 | 每 10 分鐘 |
 
-Stations are off by default; enable **Stations** and zoom in (dots at zoom 8, values at zoom 9) to select a station.
-Its readings follow the selected map time, with a dashed time marker on the last-24-hour chart.
-The timeline initially follows new frames automatically and says how old the shown frame is. **Live** is lit while it
-follows; scrubbing holds a historical time, and **Back to latest**, or dragging the slider to the newest frame, resumes.
-**Play** from the newest frame replays the last 3 hours (the whole day for hourly Temperature); from anywhere else it
-plays on from there. Keyboard: Space plays or pauses, ← and → step one frame. A map reached with Tab keeps the arrow
-keys for panning.
-**Retry** reloads unavailable data. The legend says what the active layer shows (rain: past-hour accumulation in millimetres).
+- **測站**：全臺氣象站與雨量站的即時觀測（CWA `O-A0001-001`、`O-A0002-001`、`O-A0003-001`），點選可看該站讀數與過去 24 小時趨勢圖。
+- **時間軸**：每個圖層都能回放過去 24 小時。
+- **語言**：預設繁體中文，可切換英文。
 
-Windows at least 640 px wide and tall get the layer sidebar. Anything smaller — a phone either way up — gets a row of
-layer buttons, with **Stations** beside the legend; that row makes way for an open station card. The timeline always
-stays on screen: the layer list and the station card are what shrink and scroll.
+尚未完成：風場與其他圖層（衛星雲圖等），規劃見 DESIGN.md 第 23 節的 Milestone 6、7。
 
-## Develop
+## 操作說明
+
+**語言**　介面預設為繁體中文；按右上角的 **English** 切換成英文（再按 **中文** 切回），選擇會記在瀏覽器裡。地圖上的地名會跟著切換；測站與鄉鎮名稱沿用氣象署資料，一律是中文。
+
+**圖層與圖例**　一次顯示一個圖層。圖例除了色階與單位，也用一句話說明目前圖層是什麼（例如雷達：「目前哪裡在下雨」）。
+
+**時間軸**
+
+- 開啟時自動跟著最新資料，並顯示這筆資料是多久以前的（例如「22 分鐘前」）。時間一律是臺灣時間（UTC+8）。
+- **即時** 亮起表示正在跟隨最新資料。拖動滑桿可停在過去某個時間；按 **回到最新**，或把滑桿拖回最右邊，就會恢復跟隨。
+- 在最新時間按 **播放**，會重播最近 3 小時（每小時更新的溫度圖層則重播整天）；在其他時間按播放，則從該處往後播。
+- 鍵盤：空白鍵播放／暫停，← → 前後移動一個時間。用 Tab 鍵移到地圖上時，方向鍵仍用來平移地圖。
+
+**測站**　預設關閉。勾選 **測站** 後放大地圖：縮放層級 8 以上顯示測站圓點，9 以上顯示數值。點選測站會開啟資訊卡，讀數跟著時間軸的時間走，趨勢圖上的虛線標示目前的地圖時間。
+
+**狀態與重試**　資料載入中或無法取得時，時間軸面板內會顯示一行說明；可以重試的情況會附上 **重試** 按鈕。
+
+**版面**　視窗寬、高都至少 640 px 時，圖層列表在左側。較小的畫面（手機直放或橫放）改為一排圖層按鈕，**測站** 開關移到圖例旁；開啟測站資訊卡時，圖例那一排會讓出空間。時間軸永遠留在畫面內，空間不夠時縮小並捲動的是圖層列表與測站資訊卡。
+
+## 技術架構
+
+| 部分 | 使用技術 |
+|---|---|
+| 前端（`apps/web`） | React 19、Vite 8、Tailwind CSS 4、MapLibre GL 6；底圖為 OpenFreeMap |
+| 後端（`apps/api`） | Hono，部署為 Vercel Functions（東京 `hnd1`） |
+| 資料庫 | Supabase Postgres，以 Drizzle ORM 定義 schema |
+| 檔案 | Supabase Storage：格點與雷達影格（PNG） |
+| 排程 | Supabase Cron（`pg_cron` + `pg_net`），密鑰存放在 Supabase Vault |
+
+```text
+apps/web/src        前端：地圖（map/）、時間軸（timeline/）、元件（components/）、中英文字典（i18n.ts）
+apps/api/src        後端：CWA 介接（cwa/）、資料擷取（ingestion/）、公開 API（routes/）、資料庫（db/）
+apps/api/scripts    維運指令：migration、排程狀態、補資料
+supabase/migrations 資料庫 migration（含手寫的排程與清理工作）
+api/index.ts        Vercel 的 API 進入點
+```
+
+## 開發
+
+需要 Node 22、pnpm 10，以及 [Task](https://taskfile.dev)。
 
 ```bash
-nvm use            # Node 22
+nvm use                # Node 22
 pnpm install
-cp .env.example .env   # fill in — see DESIGN.md §17
-task dev           # web on :5273, api on :8787 (proxied at /api) — `task` lists all tasks
+cp .env.example .env   # 填入各項設定，說明見 DESIGN.md 第 17 節
+task dev               # 前端 :5273、後端 :8787（前端以 /api 代理）
 ```
 
-## Database
+`task` 會列出所有指令，常用的有：
 
-Schema lives in `apps/api/src/db/schema.ts`. Never edit the production DB by hand.
+| 指令 | 用途 |
+|---|---|
+| `task dev` / `task web` / `task api` | 啟動前後端／只啟動前端／只啟動後端 |
+| `task stop` | 停止本專案啟動的開發伺服器（不會動到其他專案） |
+| `task check` | CI 執行的全部檢查：lint、型別檢查、測試、建置 |
+| `task health` | 檢查本機後端與資料庫連線 |
+| `task ingest` | 在本機後端觸發一次測站資料擷取 |
+
+### 環境變數
+
+設定在專案根目錄的 `.env`（不進版控），部署時設定在 Vercel。
+
+| 變數 | 用途 |
+|---|---|
+| `CWA_API_KEY` | 氣象署開放資料授權碼。只在後端使用，不可加上 `VITE_` 前綴 |
+| `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` | Supabase 專案網址與 service role 金鑰（後端寫入 Storage 用） |
+| `DATABASE_URL` | Postgres 連線字串（transaction pooler，埠號 6543）；migration 會自動改用 session pooler（5432） |
+| `SUPABASE_STORAGE_BUCKET` | 存放影格的 Storage bucket 名稱 |
+| `INGESTION_SECRET` | 內部排程 API 的密鑰，以 `openssl rand -hex 32` 產生 |
+| `API_BASE_URL` | 排程工作呼叫的正式站網址；由 `task cron:secrets` 寫入 Vault |
+
+## 資料庫
+
+Schema 定義在 `apps/api/src/db/schema.ts`。請勿直接手動修改正式資料庫。
 
 ```bash
-pnpm db:generate          # schema → supabase/migrations/*.sql — review, commit
-pnpm db:push --dry-run    # what would be applied
-pnpm db:push              # apply via Supabase CLI (session pooler, derived from DATABASE_URL)
+task db:generate -- --name add_x   # schema → supabase/migrations/*.sql，檢查後 commit
+task db:plan                       # 預覽會套用哪些 migration（不會變更資料庫）
+task db:push                       # 套用到 Supabase（會變更正式資料庫，執行前會再確認一次）
 ```
+
+排程、資料清理、RLS 等 migration 是手寫的 SQL，放在同一個資料夾，依檔名順序套用。
 
 ## API
 
-Public, read-only, CDN-cached. Times are ISO-8601 with an offset (`2026-09-21T20:00:00+08:00` or `...Z`).
+公開 API 皆為唯讀；資料路由由 CDN 快取（測站清單 1 小時，其餘 60 秒）。時間格式為帶時區的 ISO-8601，例如 `2026-09-21T20:00:00+08:00` 或 `...Z`。
 
-| Route | Returns |
+| 路由 | 回傳內容 |
 |---|---|
-| `GET /api/stations` | All stations (id, CWA id, name, county, WGS84 position, elevation) |
-| `GET /api/stations/:cwaId` | One station + its latest readings |
-| `GET /api/stations/:cwaId/history?from=&to=` | Its observations in a range (default last 24 h, max 62 days) |
-| `GET /api/observations?at=` | Every station's newest reading at an instant (default now) — one timeline position |
-| `GET /api/frames?layer=&from=&to=` | Timeline instants for a layer: `stations`, `radar`, `satellite`, `wind`, `rain-grid`, `temperature-grid` |
-| `POST /api/internal/ingest/stations` · `/ingest/grids` (`?layer=` for one product) · `/prune/frames` | Scheduled jobs. `Authorization: Bearer $INGESTION_SECRET` |
+| `GET /api/health` | 服務與資料庫連線狀態 |
+| `GET /api/stations` | 所有測站（編號、氣象署站號、名稱、縣市、WGS84 座標、海拔） |
+| `GET /api/stations/:cwaId` | 單一測站與其最新讀數 |
+| `GET /api/stations/:cwaId/history?from=&to=` | 該站在指定區間的觀測（預設最近 24 小時，最長 62 天） |
+| `GET /api/observations?at=` | 指定時間點各測站的最新讀數（預設為現在），對應時間軸上的一個位置 |
+| `GET /api/frames?layer=&from=&to=` | 圖層的時間軸影格。`layer` 可為 `stations`、`radar`、`rain-grid`、`temperature-grid`；`satellite`、`wind` 已保留，目前沒有資料 |
 
-## Scheduled jobs (Supabase Cron)
+內部路由供排程使用，需帶 `Authorization: Bearer $INGESTION_SECRET`：
 
-`ingest-stations` and `ingest-grids` (CWA temperature + radar-rain grids and the composite radar image → frames in
-Storage) every 10 min; `ingest-radar` asks the same endpoint for `?layer=radar` alone, five minutes after each grid run,
-because CWA replaces its radar picture about when the grid run fetches it;
-`prune-frames` nightly (image frames older than 14 days); `prune` nightly (10-minute data for 3 days, hourly for 60, then deleted — sized for the
-500 MB free tier). `task cron:status` shows runs, responses and the daily DB-size log; `task cron:secrets` reloads the
-API URL + token into Supabase Vault; `task prune:check` verifies the prune in a rolled-back transaction.
+| 路由 | 用途 |
+|---|---|
+| `POST /api/internal/ingest/stations` | 擷取測站觀測 |
+| `POST /api/internal/ingest/grids` | 擷取溫度、雨量格點與雷達圖；加上 `?layer=` 可只抓其中一項 |
+| `POST /api/internal/backfill/stations?before=&limit=` | 從氣象署歷史 API 補回測站的每小時觀測 |
+| `POST /api/internal/prune/frames` | 刪除過期影格 |
 
-## Deploy
+## 排程工作（Supabase Cron）
 
-Push to `main` → Vercel. One project, root = repo root: static site from `apps/web/dist`, API from `api/index.ts`.
+| 工作 | 時間（臺灣時間） | 內容 |
+|---|---|---|
+| `ingest-stations` | 每 10 分鐘（第 5、15、25… 分） | 測站觀測寫入資料庫 |
+| `ingest-grids` | 每 10 分鐘（第 8、18、28… 分） | 溫度、雨量格點與雷達圖存成影格（Storage） |
+| `ingest-radar` | 每 10 分鐘（第 3、13、23… 分） | 只抓雷達圖 |
+| `prune` | 每日 03:30 | 清理過期觀測，並記錄資料庫大小 |
+| `prune-frames` | 每日 03:40 | 刪除過期影格 |
+
+為什麼雷達要多抓一次：氣象署只提供最新的一張雷達圖，而且約在資料時間後 8 到 10 分鐘才發布，`ingest-grids` 常常剛好在新圖出現前抓取，下一次再抓時該圖已被更新的一張取代。兩次 `ingest-grids` 之間補抓一次，就不會漏掉。
+
+**資料保存期限**　測站觀測：10 分鐘資料保留 3 天，每小時資料保留 60 天。影格：14 天。這些期限是配合 Supabase 免費方案的容量（資料庫 500 MB、Storage 1 GB）。
+
+維運指令：
+
+| 指令 | 用途 |
+|---|---|
+| `task cron:status` | 查看排程工作、最近的執行結果與 HTTP 回應、每日資料庫大小紀錄 |
+| `task cron:secrets` | 把 `.env` 的 `API_BASE_URL` 與 `INGESTION_SECRET` 寫入 Supabase Vault |
+| `task backfill:stations` | 補回最近 24 小時的測站每小時觀測（在正式站執行，可重複執行） |
+| `task prune:check` | 驗證清理規則（在交易中執行，結束後一律還原） |
+
+## 測試與 CI
+
+測試使用 Node 內建的測試執行器（`node:test`），測試檔與原始碼放在一起（`*.test.ts`）。
+
+```bash
+task check   # 等同 CI：pnpm lint、pnpm typecheck、pnpm test、pnpm build
+```
+
+GitHub Actions 在每次 push 與 pull request 執行同一組檢查。
+
+## 部署
+
+推送到 `main` 就會部署到 Vercel。整個 repo 是一個 Vercel 專案：靜態網站來自 `apps/web/dist`，API 來自 `api/index.ts`。
+
+Vercel 建置時會先執行型別檢查與測試（`pnpm typecheck && pnpm test && pnpm build`），測試失敗就不會部署。新的 migration 不會隨部署自動套用，需另外執行 `task db:push`。
+
+## 資料來源
+
+- 天氣資料：[中央氣象署開放資料平臺](https://opendata.cwa.gov.tw/)
+- 底圖：[OpenFreeMap](https://openfreemap.org/)、© OpenMapTiles，資料來自 OpenStreetMap
