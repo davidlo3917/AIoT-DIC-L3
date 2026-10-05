@@ -11,8 +11,9 @@ export function addStationLayers(map: MapLibreMap, onSelect: (stationId: number 
     id: DOTS, type: 'circle', source: SOURCE, minzoom: 8,
     layout: { visibility: 'none' },
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 2.5, 9, 5, 12, 8],
-      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 10, 1.5],
+      // Sized to be read and tapped at city scale, where people actually look at single stations.
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 4.5, 10, 7.5, 13, 11],
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 2],
       'circle-stroke-color': '#0b1220',
       'circle-color': '#ffffff',
       // The minzoom also prevents invisible dots from intercepting island-scale clicks.
@@ -22,8 +23,10 @@ export function addStationLayers(map: MapLibreMap, onSelect: (stationId: number 
   })
   map.addLayer({
     id: LABELS, type: 'symbol', source: SOURCE, minzoom: 9,
-    layout: { visibility: 'none', 'text-field': ['get', 'label'], 'text-size': 11, 'text-offset': [0, -1.2], 'text-font': ['Noto Sans Regular'] },
-    paint: { 'text-color': '#f1f5f9', 'text-halo-color': '#0b1220', 'text-halo-width': 1.4 },
+    // Anchored by its bottom edge so the value clears the dot at every size of both.
+    layout: { visibility: 'none', 'text-field': ['get', 'label'], 'text-size': ['interpolate', ['linear'], ['zoom'], 9, 12.5, 12, 15],
+      'text-anchor': 'bottom', 'text-offset': [0, -0.85], 'text-font': ['Noto Sans Regular'] },
+    paint: { 'text-color': '#f1f5f9', 'text-halo-color': '#0b1220', 'text-halo-width': 1.6 },
   })
   const click = (e: import('maplibre-gl').MapMouseEvent) => {
     const feature = map.queryRenderedFeatures(e.point, { layers: [DOTS] })[0]
