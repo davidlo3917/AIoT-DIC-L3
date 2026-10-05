@@ -9,8 +9,13 @@ buildings, minor roads, railways, and land-use textures are omitted. Temperature
 
 Stations are off by default; enable **Stations** and zoom in (dots at zoom 8, values at zoom 9) to select a station.
 Its readings follow the selected map time, with a dashed time marker on the last-24-hour chart.
-The timeline initially follows new frames automatically. Scrubbing holds a historical time; **Latest** resumes following.
-**Retry** reloads unavailable data. Rain is labeled as past-hour accumulation in millimetres.
+The timeline initially follows new frames automatically. Scrubbing holds a historical time; **Latest**, or dragging the
+slider back to the newest frame, resumes following.
+**Retry** reloads unavailable data. The legend says what the active layer shows (rain: past-hour accumulation in millimetres).
+
+Windows at least 640 px wide and tall get the layer sidebar. Anything smaller — a phone either way up — gets a row of
+layer buttons, with **Stations** beside the legend; that row makes way for an open station card. The timeline always
+stays on screen: the layer list and the station card are what shrink and scroll.
 
 ## Develop
 
@@ -42,12 +47,13 @@ Public, read-only, CDN-cached. Times are ISO-8601 with an offset (`2026-09-21T20
 | `GET /api/stations/:cwaId/history?from=&to=` | Its observations in a range (default last 24 h, max 62 days) |
 | `GET /api/observations?at=` | Every station's newest reading at an instant (default now) — one timeline position |
 | `GET /api/frames?layer=&from=&to=` | Timeline instants for a layer: `stations`, `radar`, `satellite`, `wind`, `rain-grid`, `temperature-grid` |
-| `POST /api/internal/ingest/stations` · `/ingest/grids` · `/prune/frames` | Scheduled jobs. `Authorization: Bearer $INGESTION_SECRET` |
+| `POST /api/internal/ingest/stations` · `/ingest/grids` (`?layer=` for one product) · `/prune/frames` | Scheduled jobs. `Authorization: Bearer $INGESTION_SECRET` |
 
 ## Scheduled jobs (Supabase Cron)
 
 `ingest-stations` and `ingest-grids` (CWA temperature + radar-rain grids and the composite radar image → frames in
-Storage) every 10 min;
+Storage) every 10 min; `ingest-radar` asks the same endpoint for `?layer=radar` alone, five minutes after each grid run,
+because CWA replaces its radar picture about when the grid run fetches it;
 `prune-frames` nightly (image frames older than 14 days); `prune` nightly (10-minute data for 3 days, hourly for 60, then deleted — sized for the
 500 MB free tier). `task cron:status` shows runs, responses and the daily DB-size log; `task cron:secrets` reloads the
 API URL + token into Supabase Vault; `task prune:check` verifies the prune in a rolled-back transaction.

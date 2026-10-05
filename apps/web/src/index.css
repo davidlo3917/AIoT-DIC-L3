@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import 'maplibre-gl/dist/maplibre-gl.css';
 
+/* The sidebar arrangement needs room both ways: a phone on its side is wide but short, and gets the compact one. */
+@custom-variant desk { @media (min-width: 640px) and (min-height: 640px) { @slot; } }
+
 :root {
   color-scheme: dark;
   --ocean: #0b1220;
@@ -13,7 +16,7 @@
 }
 html, body, #root { height: 100%; margin: 0; background: var(--ocean); color: var(--text); }
 body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Noto Sans', sans-serif; }
-.weather-panel { background: color-mix(in srgb, var(--panel) 95%, transparent); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 6px 24px #0003; }
+.weather-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 6px 24px #0003; }
 .ui-button { min-height: 44px; min-width: 44px; border-radius: 8px; color: var(--text); cursor: pointer; }
 .ui-button:hover:not(:disabled) { background: #ffffff0c; }
 .ui-button:disabled { opacity: .35; cursor: default; }
@@ -21,6 +24,7 @@ body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSyst
 .ui-muted { color: var(--muted); }
 button, select, input { accent-color: var(--accent); }
 button:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+nav button:focus-visible { outline-offset: -2px; } /* the layer list scrolls when cramped, which would clip an outer ring */
 .app-chrome { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
 .maplibregl-ctrl-top-right { top: max(4px, env(safe-area-inset-top)); right: max(4px, env(safe-area-inset-right)); }
 .maplibregl-ctrl-group, .maplibregl-ctrl-attrib { background: var(--panel) !important; color: var(--muted); border: 1px solid var(--border); box-shadow: none !important; }
@@ -28,7 +32,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focu
 .maplibregl-ctrl-group button + button { border-top: 1px solid var(--border); }
 .maplibregl-ctrl-icon { filter: invert(1); opacity: .8; }
 .maplibregl-ctrl-attrib a { color: var(--muted); }
-.maplibregl-ctrl-attrib-button { min-width: 44px; min-height: 44px; background-color: #94a3b8; border-radius: 8px; }
-.maplibregl-ctrl-attrib.maplibregl-compact { min-width: 44px; min-height: 44px; padding: 0; }
+.maplibregl-ctrl-attrib-button { min-width: 44px; min-height: 44px; background-color: #94a3b8; background-repeat: no-repeat; background-position: center; border-radius: 8px; }
+.maplibregl-ctrl-attrib.maplibregl-compact { min-width: 44px; min-height: 44px; padding: 0; color: var(--muted); }
 .maplibregl-ctrl-attrib.maplibregl-compact-show { padding: 8px 48px 8px 10px; }
+.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button { background-color: #94a3b8; } /* stays visible as the way to close it */
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; } }

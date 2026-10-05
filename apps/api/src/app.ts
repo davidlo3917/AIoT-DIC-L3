@@ -6,7 +6,7 @@ import { ingestGrids, pruneFrames } from './ingestion/grids.js'
 import { backfillStations, ingestStations } from './ingestion/stations.js'
 import { ingestAuth } from './middleware/ingestAuth.js'
 import { publicRoutes } from './routes/public.js'
-import { backfillQuery } from './routes/query.js'
+import { backfillQuery, gridsQuery } from './routes/query.js'
 
 const app = new Hono().basePath('/api')
   .get('/health', async (c) => {
@@ -21,7 +21,11 @@ const app = new Hono().basePath('/api')
   .route('/', publicRoutes)
   .use('/internal/*', ingestAuth)
   .post('/internal/ingest/stations', async (c) => c.json(await ingestStations()))
-  .post('/internal/ingest/grids', async (c) => c.json(await ingestGrids())) // grids *and* radar imagery: one cron job
+  // Grids *and* radar imagery: one cron job fetches everything, a second asks for `?layer=radar` alone.
+  .post('/internal/ingest/grids', async (c) => {
+    const q = gridsQuery.safeParse(c.req.query())
+    return q.success ? c.json(await ingestGrids(q.data.layer)) : c.json({ error: q.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }, 400)
+  })
   .post('/internal/backfill/stations', async (c) => {
     const q = backfillQuery.safeParse(c.req.query())
     return q.success ? c.json(await backfillStations(q.data)) : c.json({ error: q.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }, 400)

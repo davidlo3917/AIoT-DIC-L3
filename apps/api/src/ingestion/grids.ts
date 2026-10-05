@@ -4,6 +4,7 @@ import { db } from '../db/client.js'
 import { weatherFrames } from '../db/schema.js'
 import { gridToPng, parseGrid, type GridEncoding } from '../lib/grid.js'
 import { remove, upload } from '../lib/storage.js'
+import type { GridLayer } from '../routes/query.js'
 
 // Both products are published on a TWD67 lat/lon grid. Across Taiwan, TWD67 → WGS84 is a near-constant shift
 // (measured from CWA's own station records, which carry both): about −0.0018° lat, +0.0082° lon (~800 m).
@@ -117,9 +118,10 @@ async function ingestImage(spec: ImageSpec) {
   return { layer: spec.layer, time: validAt.toISOString(), stored: true, bytes: image.length }
 }
 
-/** Every product is independent: one failing (CWA hiccup) must not block the others. */
-export async function ingestGrids() {
+/** Every product is independent: one failing (CWA hiccup) must not block the others. `only` limits the run to one product. */
+export async function ingestGrids(only?: GridLayer) {
   const jobs = [...GRIDS.map((g) => ({ layer: g.layer, run: () => ingestGrid(g) })), ...IMAGES.map((i) => ({ layer: i.layer, run: () => ingestImage(i) }))]
+    .filter((j) => !only || j.layer === only)
   const results = await Promise.allSettled(jobs.map((j) => j.run()))
   return results.map((r, i) => r.status === 'fulfilled' ? r.value : (console.error(`ingest ${jobs[i].layer} failed:`, r.reason), { layer: jobs[i].layer, error: true }))
 }

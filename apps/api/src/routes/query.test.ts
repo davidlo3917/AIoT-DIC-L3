@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { atQuery, layerQuery, MAX_RANGE_DAYS, rangeQuery, stationIdParam } from './query.js'
+import { atQuery, gridsQuery, layerQuery, MAX_RANGE_DAYS, rangeQuery, stationIdParam } from './query.js'
+
+test('grid ingest takes one known product, or none for all', () => {
+  assert.equal(gridsQuery.parse({}).layer, undefined)
+  assert.equal(gridsQuery.parse({ layer: 'radar' }).layer, 'radar')
+  assert.equal(gridsQuery.safeParse({ layer: 'bogus' }).success, false)
+  assert.equal(gridsQuery.safeParse({ layer: 'stations' }).success, false) // a real layer, but not one this endpoint fetches
+})
 
 test('range defaults to the last 24 hours', () => {
   const { from, to } = rangeQuery.parse({})

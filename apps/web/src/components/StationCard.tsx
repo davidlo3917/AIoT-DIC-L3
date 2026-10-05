@@ -50,7 +50,7 @@ export default function StationCard({ stations }: { stations: Station[] }) {
   const points = data.flatMap((r) => { const v = r[FIELD[variable]]; return v == null ? [] : [{ t: Date.parse(r.observedAt), v }] })
 
   return (
-    <aside aria-label={`Station ${station.name}`} className="weather-panel pointer-events-auto max-h-[40dvh] w-full overflow-y-auto p-3 sm:max-h-[calc(100dvh-290px)] sm:w-72">
+    <aside aria-label={`Station ${station.name}`} className="weather-panel pointer-events-auto max-h-[40dvh] w-full overflow-y-auto p-3 sm:max-h-none sm:w-72 sm:max-w-full">
       <header className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold">{station.name}</h2>

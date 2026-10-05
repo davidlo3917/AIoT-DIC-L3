@@ -32,14 +32,10 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
     })
     m.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     m.addControl(new AttributionControl({ compact: true }), 'top-right')
-    m.once('load', () => {
-      // MapLibre opens the compact attribution until the first map drag, which covers our panels; collapse it to
-      // its (i) button once it has rendered. The credit stays one tap away, as OSM/OpenFreeMap's terms require.
-      const attrib = el.current?.querySelector('.maplibregl-ctrl-attrib')
-      attrib?.classList.remove('maplibregl-compact-show')
-      attrib?.removeAttribute('open')
-      setMap(m)
-    })
+    // MapLibre opens a compact attribution as soon as it has text, unless it already carries this class; open, it
+    // covers our panels. Starting as the (i) button keeps the credit one tap away, as OSM/OpenFreeMap's terms require.
+    el.current!.querySelector('.maplibregl-ctrl-attrib')?.classList.add('maplibregl-compact')
+    m.once('load', () => setMap(m))
     return () => { setMap(null); m.remove() }
   }, [])
 

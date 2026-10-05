@@ -20,6 +20,18 @@ test('latest polling advances; scrubbing holds history; Latest resumes following
   assert.equal(currentFrame(store.getSnapshot())?.time, frames(5)[0].time)
 })
 
+test('seeking or stepping onto the newest frame resumes following', () => {
+  const store = createTimelineStore(), a = store.actions
+  load(store, frames(1, 2, 3)); a.seek(0)
+  assert.equal(store.getSnapshot().followLatest, false)
+  a.seek(2)
+  assert.equal(store.getSnapshot().followLatest, true)
+  a.step(-1)
+  assert.equal(store.getSnapshot().followLatest, false)
+  a.step(1); load(store, frames(1, 2, 3, 4))
+  assert.equal(currentFrame(store.getSnapshot())?.time, frames(4)[0].time)
+})
+
 test('late responses cannot replace a new layer, even after switching back', () => {
   const store = createTimelineStore(), a = store.actions
   const old = a.beginLoad('temperature')

@@ -43,8 +43,10 @@ export function createTimelineStore() {
     },
     retry() { request++; invalidateObservations(); set({ refreshKey: state.refreshKey + 1, loadState: 'loading' }) },
     seek(index: number) {
-      index = state.frames.length ? Math.max(0, Math.min(state.frames.length - 1, index)) : -1
-      set({ playing: false, followLatest: false, index, cursorTime: state.frames[index]?.time ?? null })
+      const last = state.frames.length - 1
+      index = Math.min(last, Math.max(0, index)) // -1 while there are no frames
+      // Landing on the newest frame (slider dragged to the end, Next onto it) means "show me now": keep following.
+      set({ playing: false, followLatest: index === last, index, cursorTime: state.frames[index]?.time ?? null })
     },
     step(by: number) { actions.seek(state.index + by) },
     latest() { set({ followLatest: true, playing: false, index: state.frames.length - 1, cursorTime: state.frames.at(-1)?.time ?? null }) },

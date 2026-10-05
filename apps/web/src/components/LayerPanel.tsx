@@ -1,21 +1,30 @@
 import { LAYERS, type LayerId } from '../layers'
 import { actions, useStore } from '../timeline/store'
 
-export default function LayerPanel() {
-  const layer = useStore((s) => s.layer), showStations = useStore((s) => s.showStations)
+/** Lives in the sidebar on roomy screens and beside the legend on compact ones, where the layer row has no room for it. */
+export function StationsToggle({ className }: { className: string }) {
+  const showStations = useStore((s) => s.showStations)
   return (
-    <nav aria-label="Weather layers" className="weather-panel pointer-events-auto flex gap-1 overflow-x-auto p-1 sm:w-44 sm:flex-col sm:overflow-visible">
+    <label className={`ui-button ui-muted shrink-0 items-center gap-2 px-3 text-sm ${className}`} title="Visible when zoomed in">
+      <input type="checkbox" checked={showStations} onChange={actions.toggleStations} className="accent-sky-400" />
+      <span>Stations<span className="hidden text-[11px] sm:inline"> · zoom in</span></span>
+    </label>
+  )
+}
+
+export default function LayerPanel() {
+  const layer = useStore((s) => s.layer)
+  return (
+    <nav aria-label="Weather layers" className="weather-panel pointer-events-auto flex gap-1 overflow-x-auto p-1 desk:w-44 desk:flex-col desk:overflow-y-auto">
       {(Object.keys(LAYERS) as LayerId[]).map((id) => (
         <button key={id} type="button" aria-pressed={layer === id} onClick={() => actions.setLayer(id)} title={LAYERS[id].hint}
-          className={`ui-button shrink-0 px-3 py-2 text-left text-sm transition-colors ${layer === id ? 'ui-active font-semibold' : 'ui-muted'}`}>
+          // Compact row: four buttons share a phone's width (tight enough for 360 px in English), and the active one
+          // keeps its weight so none of them moves.
+          className={`ui-button shrink-0 grow px-1.5 py-2 text-center text-[13px] transition-colors sm:px-3 sm:text-sm desk:grow-0 desk:text-left ${layer === id ? 'ui-active desk:font-semibold' : 'ui-muted'}`}>
           {LAYERS[id].label}
-          {layer === id && <span className="mt-1 hidden text-xs font-normal opacity-80 sm:block">{LAYERS[id].hint} · {LAYERS[id].legend.unit}</span>}
         </button>
       ))}
-      <label className="ui-button ui-muted flex shrink-0 items-center gap-2 px-3 py-2 text-sm sm:mt-1 sm:border-t sm:border-[var(--border)]">
-        <input type="checkbox" checked={showStations} onChange={actions.toggleStations} className="accent-sky-400" />
-        <span>Stations<span className="hidden text-[11px] sm:block">Visible when zoomed in</span></span>
-      </label>
+      <StationsToggle className="hidden desk:mt-1 desk:flex desk:border-t desk:border-[var(--border)]" />
     </nav>
   )
 }
