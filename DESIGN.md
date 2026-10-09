@@ -453,10 +453,6 @@ Facts worth knowing:
 | Wind particles | not started | CWA WRF GRIB2 → GitHub Actions + Python (ecCodes/cfgrib) → U/V field files in Storage → WebGL particle layer; the frames contract already fits |
 | Satellite imagery | not started | one more image product in `ingestion/grids.ts` plus a layer definition; the radar path is the template |
 | Lightning, typhoon tracks, warnings | not started | datastore ingestion + point/line/polygon layers; the tables designed for them were dropped on 2026-10-09 so the schema matches what runs |
-| Forecast history (versioned `forecast_runs`) | replaced | the forecast is proxied live from CWA (§7); storing versions only pays off with a forecast-vs-actual feature |
-| English interface | removed 2026-10-09 | the audience is Taiwanese; one language halved the string table and removed the switch |
-| Value at a tapped point, selected-station ring, phone camera fit | ideas | small frontend work, none blocking |
-| Accounts, saved places, alerts | out of scope | |
 
 ---
 
