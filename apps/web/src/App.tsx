@@ -28,8 +28,9 @@ export default function App() {
       <MapView stations={stations} onStatus={setStatus} />
       {/* Overlay chrome ignores the pointer except on the panels themselves, so the map stays draggable everywhere else. */}
       <div className="app-chrome pointer-events-none absolute inset-0 flex flex-col gap-2">
-        {/* A phone on its side keeps about 300 px under the browser's own bars; the title gives way there. */}
-        <header className="flex flex-wrap items-center gap-x-2 pr-14 [@media(max-height:359px)]:hidden">
+        {/* A phone on its side keeps about 300 px under the browser's own bars; the title gives way there. On phones the
+            title sits on a translucent chip: zoomed out, offshore station values (馬祖) pass right under it. */}
+        <header className="flex flex-wrap items-center gap-x-2 self-start rounded-lg bg-[#0b1220cc] px-2.5 py-1.5 sm:self-auto sm:bg-transparent sm:p-0 sm:pr-14 [@media(max-height:359px)]:hidden">
           <h1 className="text-lg font-semibold tracking-wide drop-shadow">{t('app.title')}</h1>
           <p className="ui-muted order-last basis-full text-sm sm:order-none sm:basis-auto">{t('app.source')}</p>
         </header>
