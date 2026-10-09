@@ -1,6 +1,8 @@
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl'
 
 export const MAP_COLORS = { ocean: '#0b1220', land: '#334155', line: '#94a3b8', label: '#cbd5e1' }
+/** The opening view, and the box (Taiwan + surrounding sea, the radar crop) outside which a viewer has wandered off to a typhoon. */
+export const HOME = { center: [120.97, 23.7] as [number, number], zoom: 6.5, bounds: [115, 17.75, 126.5, 29.25] as const }
 export const REFERENCE_LAYER = 'weather-main-roads'
 // Traditional Chinese first, then whatever the tile has: a place with no Chinese name still gets a label.
 const NAMES = ['name:zh-Hant', 'name:zh', 'name:nonlatin', 'name', 'name:en', 'name_en']

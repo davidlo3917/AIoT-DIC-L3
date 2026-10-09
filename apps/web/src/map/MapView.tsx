@@ -6,7 +6,7 @@ import type { Station } from '../api'
 import { t } from '../i18n'
 import { STATUS, type Status } from '../status'
 import { useWeather } from './useWeather'
-import { weatherBasemap } from './basemap'
+import { HOME, weatherBasemap } from './basemap'
 
 setWorkerUrl(workerUrl)
 
@@ -21,8 +21,8 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
   useEffect(() => {
     const m = new MapLibreMap({
       container: el.current!,
-      center: [120.97, 23.7],
-      zoom: 6.5,
+      center: HOME.center,
+      zoom: HOME.zoom,
       minZoom: 4,
       maxBounds: [100, 0, 180, 50], // CWA's whole typhoon basin: a track usually starts far out in the Pacific
       // A label whose text changes (25.0 → 25.3) counts as a new one, and would fade in from nothing on every frame.

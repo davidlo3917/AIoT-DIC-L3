@@ -72,6 +72,11 @@ export function addTyphoonLayers(map: MapLibreMap) {
   }
 }
 
+/** Playback is about the weather moving; a static track and its circles only get in the way of it. */
+export function setTyphoonsVisible(map: MapLibreMap, visible: boolean) {
+  for (const id of LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
+}
+
 export function updateTyphoons(map: MapLibreMap, cyclones: Cyclone[]) {
   ;(map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData(typhoonFeatures(cyclones))
 }

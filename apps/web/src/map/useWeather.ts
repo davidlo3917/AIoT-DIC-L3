@@ -7,9 +7,9 @@ import { actions, currentFrame, useStore } from '../timeline/store'
 import { loadField, loadImage, paint, type Field } from './layers/grid'
 import { idw } from './layers/idw'
 import { addStationLayers, updateStations, setStationsVisible } from './layers/stations'
-import { addTyphoonLayers, cycloneBounds, updateTyphoons } from './layers/typhoon'
-import { addWarningLayers, updateWarnings, type Counties } from './layers/warnings'
-import { REFERENCE_LAYER } from './basemap'
+import { addTyphoonLayers, cycloneBounds, setTyphoonsVisible, updateTyphoons } from './layers/typhoon'
+import { addWarningLayers, countyBounds, updateWarnings, type Counties } from './layers/warnings'
+import { HOME, REFERENCE_LAYER } from './basemap'
 
 const SURFACE = 'surface'
 const COAST = 'surface-coast' // copy of the basemap's water, drawn over land-only layers so the real coastline clips them
@@ -18,6 +18,19 @@ const FRAME_MS = 700 // how long a frame stays up at 1×
 
 const corners = ([w, s, e, n]: Field['bounds']) => [[w, n], [e, n], [e, s], [w, s]] as [[number, number], [number, number], [number, number], [number, number]]
 const scratch = () => Object.assign(document.createElement('canvas'), { width: 2, height: 2 })
+
+/**
+ * Fly to `bounds` keeping them out from under the panels: the sidebar and the alerts top-right on roomy screens, the
+ * layer row and alerts above and the legend and timeline below on compact ones. Where the bounds cannot fit (a phone,
+ * or one on its side), the map centres `fallback` in the free part of the screen instead.
+ */
+function flyToBounds(map: MapLibreMap, bounds: [number, number, number, number], fallback: [number, number] | undefined) {
+  const desk = window.matchMedia('(min-width: 640px) and (min-height: 640px)').matches
+  const padding = desk ? { left: 330, top: 40, right: 340, bottom: 230 } : { left: 24, top: 270, right: 24, bottom: 300 }
+  const camera = map.cameraForBounds(bounds, { padding, maxZoom: 7 })
+  if (camera && camera.zoom! >= map.getMinZoom()) map.flyTo(camera)
+  else if (fallback) map.flyTo({ center: fallback, zoom: map.getMinZoom(), padding })
+}
 
 /** Wires the store to the map: frames for the active layer, the crossfading surface, playback, and the station dots. */
 export function useWeather(map: MapLibreMap | null, stations: Station[]) {
@@ -238,20 +251,20 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   useEffect(() => {
     const cyclone = typhoonFocus && typhoons[typhoonFocus.index], bounds = cyclone && cycloneBounds(cyclone)
     if (!map || !bounds) return
-    // Keep the track out from under the panels: the sidebar on roomy screens, the layer row and chip above and the
-    // legend and timeline below on compact ones. Where the whole track cannot fit (a phone, or one on its side), the
-    // storm itself is centred in the free part of the screen instead.
-    const desk = window.matchMedia('(min-width: 640px) and (min-height: 640px)').matches
-    const padding = desk ? { left: 330, top: 40, right: 40, bottom: 230 } : { left: 24, top: 270, right: 24, bottom: 300 }
-    const camera = map.cameraForBounds(bounds, { padding, maxZoom: 7 })
     const now = cyclone.analysis.at(-1) ?? cyclone.forecast[0]
-    if (camera && camera.zoom! >= map.getMinZoom()) map.flyTo(camera)
-    else if (now) map.flyTo({ center: [now.lon, now.lat], zoom: map.getMinZoom(), padding })
+    flyToBounds(map, bounds, now && [now.lon, now.lat])
   }, [map, typhoonFocus]) // not `typhoons`: a refreshed list must not fly the viewer back
+  // Playback is about the weather moving: the tracks go away for it, and a viewer who had flown out to a storm comes home.
+  useEffect(() => {
+    if (!map) return
+    setTyphoonsVisible(map, !playing)
+    const { lng, lat } = map.getCenter(), [w, s, e, n] = HOME.bounds
+    if (playing && (lng < w || lng > e || lat < s || lat > n)) map.flyTo({ center: HOME.center, zoom: HOME.zoom })
+  }, [map, playing])
 
   // County advisories, same pattern. The county outlines (a static 22-polygon file) are fetched the first time there is
   // something to paint, and forgotten on failure so the next advisory tries again.
-  const warnings = useStore((s) => s.warnings)
+  const warnings = useStore((s) => s.warnings), warningFocus = useStore((s) => s.warningFocus)
   const counties = useRef<Promise<Counties> | null>(null)
   useEffect(() => {
     const ac = new AbortController()
@@ -265,9 +278,19 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     if (!warnings.length) return updateWarnings(map, null, [])
     let alive = true
     counties.current ??= fetch('/counties.json').then((r) => r.ok ? r.json() : Promise.reject(new Error(`counties: ${r.status}`)))
-    counties.current.then((c) => { if (alive) updateWarnings(map, c, warnings) }, () => { counties.current = null })
+    counties.current.then((c) => { if (alive) updateWarnings(map, c, warnings, warningFocus) }, () => { counties.current = null })
     return () => { alive = false }
-  }, [map, warnings])
+  }, [map, warnings, warningFocus])
+  // Opening an advisory also brings its counties into view (a refreshed list keeps the focus and must not fly again).
+  useEffect(() => {
+    if (!map || warningFocus == null) return
+    let alive = true
+    counties.current?.then((c) => {
+      const bounds = alive && warnings[warningFocus] && countyBounds(c, warnings[warningFocus].counties)
+      if (bounds) flyToBounds(map, bounds, undefined)
+    }, () => {})
+    return () => { alive = false }
+  }, [map, warningFocus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Warm the caches two frames ahead so playback doesn't stutter on the network.
   const frames = useStore((s) => s.frames), index = useStore((s) => s.index)

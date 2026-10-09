@@ -1,12 +1,14 @@
-import { useState } from 'react'
 import { shortDayTime, t } from '../i18n'
 import { warningColor } from '../map/layers/warnings'
-import { useStore } from '../timeline/store'
+import { actions, useStore } from '../timeline/store'
 
-/** The county advisories in force, in the map's colours; one opens to its counties and CWA's text. Nothing is shown when there are none. */
+/**
+ * The county advisories in force, in the map's colours; one opens to its counties and CWA's text, and the map stresses
+ * those counties and brings them into view. Nothing is shown when there are none.
+ */
 export default function Warnings() {
-  const warnings = useStore((s) => s.warnings)
-  const [open, setOpen] = useState<number | null>(null)
+  const warnings = useStore((s) => s.warnings), open = useStore((s) => s.warningFocus)
+  const setOpen = actions.focusWarning
   if (!warnings.length) return null
   return (
     <section aria-label={t('warnings.title')} className="weather-panel pointer-events-auto shrink-0 p-1 text-sm">
@@ -21,7 +23,8 @@ export default function Warnings() {
           {open === i && (
             <div className="px-2 pb-2 text-[13px]">
               <p>{w.counties.join('、')}</p>
-              {w.text && <p className="ui-muted mt-1 whitespace-pre-line">{w.text}</p>}
+              {/* CWA's text is long; folded by default so the opened row stays short and a phone still sees the map. */}
+              {w.text && <details className="mt-1"><summary className="ui-muted cursor-pointer py-1">{t('warnings.text')}</summary><p className="ui-muted mt-1 whitespace-pre-line">{w.text}</p></details>}
             </div>
           )}
         </div>
