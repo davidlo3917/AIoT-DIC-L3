@@ -11,6 +11,10 @@
 |---|---|
 | ![雷達圖層：目前哪裡在下雨](docs/screenshots/radar.jpg) | ![放大後顯示測站數值，點選測站開啟資訊卡、一週預報與 24 小時趨勢圖](docs/screenshots/stations.jpg) |
 
+| 風場預報 | 衛星雲圖 |
+|---|---|
+| ![風圖層：顏色為風速，流動的線條為風向，時間軸可看到未來 3 天](docs/screenshots/wind.jpg) | ![衛星圖層：向日葵衛星紅外線雲圖](docs/screenshots/satellite.jpg) |
+
 <p>
   <img src="docs/screenshots/mobile-radar.jpg" width="270" alt="手機版：雷達圖層">
   &nbsp;
