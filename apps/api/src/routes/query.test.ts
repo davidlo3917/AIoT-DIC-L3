@@ -5,6 +5,7 @@ import { atQuery, forecastQuery, gridsQuery, layerQuery, MAX_RANGE_DAYS, rangeQu
 test('grid ingest takes one known product, or none for all', () => {
   assert.equal(gridsQuery.parse({}).layer, undefined)
   assert.equal(gridsQuery.parse({ layer: 'radar' }).layer, 'radar')
+  assert.equal(gridsQuery.parse({ layer: 'satellite' }).layer, 'satellite')
   assert.equal(gridsQuery.safeParse({ layer: 'bogus' }).success, false)
   assert.equal(gridsQuery.safeParse({ layer: 'stations' }).success, false) // a real layer, but not one this endpoint fetches
 })

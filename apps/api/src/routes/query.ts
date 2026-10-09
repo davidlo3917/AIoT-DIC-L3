@@ -17,7 +17,7 @@ export const rangeQuery = z.object({ from: instant.optional(), to: instant.optio
 /** `?at=` — defaults to now. */
 export const atQuery = z.object({ at: instant.optional() }).transform((q) => ({ at: q.at ?? new Date() }))
 
-export const LAYERS = ['stations', 'radar', 'rain-grid', 'temperature-grid'] as const
+export const LAYERS = ['stations', 'radar', 'satellite', 'rain-grid', 'temperature-grid'] as const
 export const layerQuery = z.object({ layer: z.enum(LAYERS) })
 
 // CWA station ids are short alphanumerics ("466940", "C0TB40"); reject anything else before it reaches SQL or logs.
@@ -30,7 +30,7 @@ export const forecastQuery = z.object({
 })
 
 /** `?layer=` for the grid ingest endpoint: fetch that one product only (the extra radar job), or all of them when absent. */
-export const gridsQuery = z.object({ layer: z.enum(['temperature-grid', 'rain-grid', 'radar']).optional() })
+export const gridsQuery = z.object({ layer: z.enum(['temperature-grid', 'rain-grid', 'radar', 'satellite']).optional() })
 export type GridLayer = NonNullable<z.infer<typeof gridsQuery>['layer']>
 
 /** `?before=&limit=` for the backfill endpoint: a cursor and a batch size small enough for one serverless invocation. */

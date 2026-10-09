@@ -31,7 +31,7 @@ async function decode(url: string, width: number, height: number, offset: number
   return { width, height, values, bounds }
 }
 
-// ---- ready-made images (radar) ---------------------------------------------------------------------------------
+// ---- ready-made images (radar, satellite) ----------------------------------------------------------------------
 
 // CWA's radar PNG is 3600² (52 MB decoded). Decode it at a size the screen can actually show; on a phone that is
 // the difference between smooth playback and the tab being killed for memory.

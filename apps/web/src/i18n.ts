@@ -10,6 +10,7 @@ export const zh = {
   'layer.temperature': '溫度', 'layer.temperature.hint': '氣溫，每小時更新',
   'layer.rain': '雨量', 'layer.rain.hint': '過去 1 小時累積雨量',
   'layer.radar': '雷達', 'layer.radar.hint': '目前哪裡在下雨',
+  'layer.satellite': '衛星', 'layer.satellite.hint': '目前哪裡有雲（紅外線）',
   'layer.humidity': '濕度', 'layer.humidity.hint': '由測站資料推估',
   'legend.label': '{name}色階，{lo} 到 {hi} {unit}。{hint}',
   'stations.toggle': '測站', 'stations.zoomHint': '放大看更多', 'stations.title': '縮小時只顯示主要測站，放大地圖可看到更多',

@@ -12,7 +12,7 @@ A Windy-style weather map of **Taiwan and the surrounding sea**, built on the **
 
 What a visitor gets:
 
-- A full-screen interactive map (MapLibre GL) with one weather layer at a time: temperature, rain, radar, humidity
+- A full-screen interactive map (MapLibre GL) with one weather layer at a time: temperature, rain, radar, satellite, humidity
 - 1,367 weather and rain-gauge stations drawn as value-labelled dots, thinned by zoom level
 - A station card with the current readings, the township's 7-day forecast and a 24-hour chart
 - A shared timeline that plays back the last **7 days** of every layer at 10-minute (or hourly) steps
@@ -78,6 +78,7 @@ Interaction:
 | 溫度 Temperature | Air temperature grid, land only | `O-A0038-003` (0.03°, 67 × 120) | hourly | grid → rg16 PNG frame → coloured in the browser |
 | 雨量 Rain | Radar-estimated rainfall of the past hour | `O-B0045-001` (0.0125°, 921 × 881) | 10 min | same as temperature |
 | 雷達 Radar | Composite reflectivity picture (dBZ) | `O-A0058-005` (PNG, 3600²) | 10 min | copied to Storage as-is, resampled in the browser |
+| 衛星 Satellite | Himawari infrared colour cloud picture, coastlines drawn in | `O-C0042-002` (JPG, 800²) | 10 min | same as radar; no legend, the picture has no scale to read |
 | 濕度 Humidity | Relative humidity | station observations (no CWA grid exists) | 10 min | interpolated in the browser (§13) |
 
 Station data:
@@ -91,7 +92,7 @@ Station data:
 
 The three station datasets overlap (2,581 records, 1,365–1,367 unique stations); later datasets win on metadata. CWA publishes observations about 15 minutes late, and the radar picture 8–10 minutes after its frame time.
 
-Not built: wind, satellite, lightning, typhoon, warnings (§20).
+Not built: wind, lightning, typhoon, warnings (§20).
 
 ---
 
@@ -100,7 +101,7 @@ Not built: wind, satellite, lightning, typhoon, warnings (§20).
 ```text
                  ┌─────────────────────┐
                  │   CWA Open Data     │  REST datastore (stations, forecast)
-                 │                     │  file API → public S3 (grids, radar PNG)
+                 │                     │  file API → public S3 (grids, radar and satellite pictures)
                  └──────────┬──────────┘
                             │ fetch, server-side only (API key)
    Supabase Cron            ▼
@@ -159,7 +160,7 @@ Deliberately absent: Turborepo, a `packages/` layer, Python/GRIB tooling, a clie
 │   ├── web/                     React + MapLibre frontend
 │   │   └── src/
 │   │       ├── api.ts           typed fetchers for /api, 7-day window, observation cache
-│   │       ├── layers.ts        the four layers: frames source, cadence, loop, kind, legend
+│   │       ├── layers.ts        the five layers: frames source, cadence, loop, kind, legend
 │   │       ├── ramps.ts         colour ramps and MapLibre colour expressions
 │   │       ├── i18n.ts          every string, Taiwan-time formatters
 │   │       ├── status.ts        the status line's messages and actions
@@ -172,7 +173,7 @@ Deliberately absent: Turborepo, a `packages/` layer, Python/GRIB tooling, a clie
 │       │   ├── app.ts           routes + error handling
 │       │   ├── routes/          public routes, query schemas
 │       │   ├── cwa/             CWA client, station normaliser, forecast normaliser
-│       │   ├── ingestion/       stations (+ backfill), grids + radar, frame prune
+│       │   ├── ingestion/       stations (+ backfill), grids + pictures (radar, satellite), frame prune
 │       │   ├── db/              Drizzle schema, client
 │       │   ├── lib/             grid parsing, PNG encoder, Storage calls
 │       │   └── middleware/      bearer auth for /internal
@@ -200,16 +201,16 @@ All public routes are read-only `GET`s under `/api`, JSON, and every response ca
 | `GET /api/stations/:cwaId/history?from=&to=` | one station's observations in the range (default last 24 h, max 8 days) | 60 s |
 | `GET /api/observations?at=` | every station's reading at one instant: per field, the newest non-null value in the 100 min before `at` (stations report at different cadences) | 60 s |
 | `GET /api/forecast?county=&town=` | a township's 12-hourly periods for the coming week; proxied live from CWA, nothing stored; only townships that have a station are accepted | 30 min |
-| `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `rain-grid` or `temperature-grid` | 60 s |
+| `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `satellite`, `rain-grid` or `temperature-grid` | 60 s |
 
-The **frames contract** is the one shape every layer answers in. Station frames are a synthetic 10-minute grid clipped to what is stored (no URL: the browser asks `/observations` per frame). Grid and radar frames carry the Storage URL and the WGS84 bounds; encoded grids also carry their decoding recipe in `meta`.
+The **frames contract** is the one shape every layer answers in. Station frames are a synthetic 10-minute grid clipped to what is stored (no URL: the browser asks `/observations` per frame). Grid and picture frames carry the Storage URL and the WGS84 bounds; encoded grids also carry their decoding recipe in `meta`.
 
 Internal routes are `POST`, require `Authorization: Bearer $INGESTION_SECRET`, and are called by Supabase Cron:
 
 | Route | Does |
 |---|---|
 | `/api/internal/ingest/stations` | fetch the three station datasets, upsert stations, insert observations |
-| `/api/internal/ingest/grids[?layer=]` | temperature grid, rain grid and radar picture → Storage + `weather_frames`; `layer=` runs one |
+| `/api/internal/ingest/grids[?layer=]` | temperature grid, rain grid, radar and satellite pictures → Storage + `weather_frames`; `layer=` runs one |
 | `/api/internal/backfill/stations?before=&limit=` | fill hourly station readings from CWA's 24-hour history API |
 | `/api/internal/prune/frames` | delete frames older than 7 days (≤ 1,000 per call) |
 
@@ -233,7 +234,7 @@ station_observations                       PK (station_id, observed_at); index (
   (no surrogate id, no created_at: ~190k rows/day on a 500 MB plan, ~240 B per row with indexes)
 
 weather_frames                             index (layer_type, valid_at desc); storage_path unique
-  id serial PK · layer_type text (radar | rain-grid | temperature-grid) · valid_at timestamptz
+  id serial PK · layer_type text (radar | satellite | rain-grid | temperature-grid) · valid_at timestamptz
   storage_path text · min_lat, max_lat, min_lon, max_lon double · metadata_json jsonb · created_at
 ```
 
@@ -249,12 +250,13 @@ Upserts are idempotent: observations conflict on `(station_id, observed_at)` and
 
 ## 9. Storage and Frame Encoding
 
-Bucket `weather-data` (public read, PNG only, 5 MB per file). Paths embed the frame time, so a path's content never changes and files are uploaded with `Cache-Control: max-age=31536000, immutable`:
+Bucket `weather-data` (public read, PNG and JPEG only, 5 MB per file). Paths embed the frame time, so a path's content never changes and files are uploaded with `Cache-Control: max-age=31536000, immutable`:
 
 ```text
 temperature-grid/2026/10/09/0600Z.png     ~6 KB
 rain-grid/2026/10/09/0600Z.png            ~4 KB
-radar/2026/10/09/0600Z.png                CWA's own PNG, ~90 KB
+radar/2026/10/09/0600Z.png                CWA's own PNG, ~100 KB
+satellite/2026/10/09/0600Z.jpg            CWA's own JPG, ~90 KB
 ```
 
 **rg16 encoding.** A float grid becomes a PNG whose pixels carry the value, not a colour: `value16 = round((v + offset) × scale)`, red = high byte, green = low byte, alpha = 255 where valid and 0 for "no data" (sea, outside coverage). Temperature uses offset 50 / scale 100 (0.01 °C steps), rain offset 0 / scale 10 (0.1 mm steps). The recipe is stored in `metadata_json` and returned as `meta`, so the browser decodes any frame without knowing the layer. Colouring happens in the browser, which means a ramp can change without re-ingesting anything.
@@ -272,16 +274,16 @@ Supabase Cron calls the API; the API does the work next to the database. All tim
 | Job | Schedule | Calls |
 |---|---|---|
 | `ingest-stations` | every 10 min at :05, :15 … | `/api/internal/ingest/stations` |
-| `ingest-grids` | every 10 min at :08, :18 … | `/api/internal/ingest/grids` (temperature, rain, radar) |
+| `ingest-grids` | every 10 min at :08, :18 … | `/api/internal/ingest/grids` (temperature, rain, radar, satellite) |
 | `ingest-radar` | every 10 min at :03, :13 … | `/api/internal/ingest/grids?layer=radar` |
 | `prune` | daily 03:30 | `private.prune(7 days, 7 days)` in SQL |
 | `prune-frames` | daily 03:40 | `/api/internal/prune/frames` |
 
 Design points:
 
-- **Each product is independent.** `ingestGrids` runs the three products with `Promise.allSettled`; `ingestStations` fetches its three datasets the same way. One CWA hiccup costs one product for one cycle, never the whole cycle — and 10-minute readings CWA never serves again.
+- **Each product is independent.** `ingestGrids` runs the four products with `Promise.allSettled`; `ingestStations` fetches its three datasets the same way. One CWA hiccup costs one product for one cycle, never the whole cycle — and 10-minute readings CWA never serves again.
 - **Radar is fetched twice per cycle** because CWA only ever serves the latest picture and publishes it 8–10 minutes after frame time; a single :08 fetch missed 23 of 143 frames a day, the extra :03 fetch brought that to ~2.
-- **The radar picture's URL comes from a CWA document**, so it is treated as untrusted: only `https://cwaopendata.s3.ap-northeast-1.amazonaws.com/` is fetched, redirects are refused, and the file is capped at 5 MB.
+- **The radar and satellite pictures' URLs come from CWA documents**, so they are treated as untrusted: only `https://cwaopendata.s3.ap-northeast-1.amazonaws.com/` is fetched, redirects are refused, the file is capped at 5 MB and must start with the PNG or JPEG signature the product promises.
 - **Upload before insert.** A `weather_frames` row must never point at a missing file; an orphan file is invisible, an orphan row would be a broken frame.
 - **Backfill** exists only for automatic stations (`O-A0001-001` keeps 24 hourly XML snapshots). It is driven in batches of a few files per call so one call fits a function invocation.
 - Every CWA call has a timeout (10–45 s) and every response is validated with zod before anything is written; one malformed station record is skipped and counted, not fatal.
@@ -290,9 +292,9 @@ Design points:
 
 ## 11. Retention and Capacity
 
-The free tier allows 500 MB of database and 1 GB of Storage. Measured: ~193k observation rows a day at ~240 B (with indexes) ⇒ about 46 MB/day; frames ~312/day.
+The free tier allows 500 MB of database and 1 GB of Storage. Measured: ~193k observation rows a day at ~240 B (with indexes) ⇒ about 46 MB/day; frames ~456/day, of which radar (~100 KB) and satellite (~90 KB) are nearly all the bytes.
 
-Policy, since 2026-10-09: **every station reading and every frame is kept for 7 days**, which is exactly what the timeline plays back. Steady state ≈ 325 MB of database (plus a 12 MB empty baseline) and well under 1 GB of Storage.
+Policy, since 2026-10-09: **every station reading and every frame is kept for 7 days**, which is exactly what the timeline plays back. Steady state ≈ 325 MB of database (plus a 12 MB empty baseline) and ≈ 200 MB of Storage.
 
 - `private.prune(fine, hourly)` deletes observations older than the windows in one statement (the previous policy thinned 3–60-day-old rows to hourly; with both windows at 7 days that step is a no-op by design, and the function still supports it).
 - `pruneFrames` deletes files first, then rows, at most 1,000 per night (about three days' worth, so a backlog clears in a few nights).
@@ -334,7 +336,7 @@ layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 
 
 **Grids.** The rg16 PNG is decoded with `createImageBitmap` (`premultiplyAlpha: 'none'`, no colour conversion — the bytes are the data) and coloured through the layer's ramp. Coarse grids (temperature, 3 km cells) are upsampled 6× with bilinear interpolation so the surface reads as a field; stepped ramps (rain) stay nearest-neighbour so no value is invented across a threshold. Land-only layers are drawn ~2 cells past CWA's staircase land mask and clipped by a copy of the basemap's water polygons drawn on top (`surface-coast`), so the true coastline cuts them.
 
-**Radar.** CWA's 3600² PNG (52 MB decoded) is decoded at 1200 or 1800 px depending on the screen, resampled once, and cached ready to blit — on a phone that is the difference between smooth playback and the tab being killed.
+**Pictures (radar, satellite).** CWA's 3600² radar PNG (52 MB decoded) is decoded at 1200 or 1800 px depending on the screen, resampled once, and cached ready to blit — on a phone that is the difference between smooth playback and the tab being killed. The 800² satellite JPG takes the same path. Neither is coloured here, so the legend shows radar's dBZ scale read off CWA's palette and, for satellite, only the layer's name and hint.
 
 **Humidity.** No CWA grid exists, so the station readings are interpolated in the browser with inverse-distance weighting (1/d²) onto the latest temperature grid's land cells, which gives Taiwan's outline for free. ~3.5k land cells × ~1.2k stations ≈ 4M distances, ~20 ms. A k-nearest index is the upgrade if either count grows 10×.
 
@@ -415,7 +417,7 @@ What is in place, and what it protects against:
 | Every query parameter validated with zod before it reaches SQL, logs or CWA: ISO instants, 8-day range cap, station id `^[A-Za-z0-9]{4,12}$`, county from a fixed list, township shape **and** must belong to a station | `routes/query.ts`, `routes/public.ts` |
 | All SQL parameterised through Drizzle; the one `sql.raw` uses hard-coded column names | `routes/public.ts` |
 | The forecast proxy cannot be pointed elsewhere: fixed host, dataset from the county map, township URL-encoded | `cwa/client.ts`, `cwa/forecast.ts` |
-| The radar fetch only follows CWA's own S3 host, no redirects, 5 MB cap | `ingestion/grids.ts` |
+| The radar and satellite fetches only follow CWA's own S3 host, no redirects, 5 MB cap, PNG/JPEG signature checked | `ingestion/grids.ts` |
 | Generic error bodies; details only in server logs | `app.ts` |
 | Postgres: TLS enforced, RLS on every table with no policies, cron functions `security definer` with empty `search_path` in a non-exposed schema, execute revoked from `public`, secrets in Vault | migrations |
 | Response headers on every route: `Content-Security-Policy` (`default-src 'self'`; connections only to the API, OpenFreeMap and Supabase Storage; `frame-ancestors 'none'`; no inline scripts or styles), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS (Vercel) | `vercel.json` |
@@ -451,7 +453,6 @@ Facts worth knowing:
 | Feature | Status | Shape of the work |
 |---|---|---|
 | Wind particles | not started | CWA WRF GRIB2 → GitHub Actions + Python (ecCodes/cfgrib) → U/V field files in Storage → WebGL particle layer; the frames contract already fits |
-| Satellite imagery | not started | one more image product in `ingestion/grids.ts` plus a layer definition; the radar path is the template |
 | Lightning, typhoon tracks, warnings | not started | datastore ingestion + point/line/polygon layers; the tables designed for them were dropped on 2026-10-09 so the schema matches what runs |
 
 ---
@@ -465,6 +466,7 @@ Facts worth knowing:
 - **2026-10-05** Radar ingested twice per cycle after counting 23 missed frames a day and polling CWA's publish timing.
 - **2026-10-05** TLS enforced on the database, WAF rate limit added, README rewritten in zh-TW.
 - **2026-10-09** Chinese-only UI; stations on by default and thinned by zoom; label and card flicker fixed with keep-until-replaced; township forecast added as a live proxy; 7-day playback; four speculative tables and unused API fields removed; security headers, dependency overrides and CI pins added; this document rewritten as-built.
+- **2026-10-09** Satellite layer shipped: the radar ingest became a list of picture products (format, signature and JSON shape per product), and the legend learned to show a picture layer that has no scale.
 
 ---
 

@@ -47,8 +47,8 @@ const GRIDS: GridSpec[] = [
 ]
 
 const pad = (n: number) => String(n).padStart(2, '0')
-const framePath = (layer: string, t: Date) =>
-  `${layer}/${t.getUTCFullYear()}/${pad(t.getUTCMonth() + 1)}/${pad(t.getUTCDate())}/${pad(t.getUTCHours())}${pad(t.getUTCMinutes())}Z.png`
+const framePath = (layer: string, t: Date, ext = 'png') =>
+  `${layer}/${t.getUTCFullYear()}/${pad(t.getUTCMonth() + 1)}/${pad(t.getUTCDate())}/${pad(t.getUTCHours())}${pad(t.getUTCMinutes())}Z.${ext}`
 
 async function ingestGrid(spec: GridSpec) {
   const g = spec.read((await fetchFileApi(spec.datasetId)).cwaopendata.dataset)
@@ -74,10 +74,28 @@ async function ingestGrid(spec: GridSpec) {
   return { layer: spec.layer, time: validAt.toISOString(), stored: true, bytes: png.length }
 }
 
-// Radar is a ready-made picture: CWA's JSON points at a PNG on its public S3 (composite reflectivity, transparent
-// background, every 10 min). We keep a copy per timestamp, because CWA only ever serves the latest one and the
-// timeline needs history.
-const RADAR = 'O-A0058-005'
+// Radar and satellite are ready-made pictures: CWA's JSON points at an image on its public S3, every 10 min. We keep
+// a copy per timestamp, because CWA only ever serves the latest one and the timeline needs history.
+type ImageSpec = {
+  layer: 'radar' | 'satellite'
+  datasetId: string
+  format: keyof typeof FORMATS
+  read: (dataset: any) => { time: unknown; url: unknown; lonRange: unknown; latRange: unknown }
+}
+
+const FORMATS = { png: { type: 'image/png', magic: '89504e47' }, jpg: { type: 'image/jpeg', magic: 'ffd8ff' } } as const
+
+const IMAGES: ImageSpec[] = [
+  {
+    layer: 'radar', datasetId: 'O-A0058-005', format: 'png', // composite reflectivity, transparent background, 3600²
+    read: (d) => ({ time: d.DateTime, url: d.resource?.ProductURL, lonRange: d.datasetInfo?.parameterSet?.LongitudeRange, latRange: d.datasetInfo?.parameterSet?.LatitudeRange }),
+  },
+  {
+    layer: 'satellite', datasetId: 'O-C0042-002', format: 'jpg', // Himawari infrared colour composite, opaque, 800², coastlines drawn in
+    read: (d) => ({ time: d.ObsTime?.Datetime, url: d.Resource?.ProductURL, lonRange: d.GeoInfo?.LongitudeRange, latRange: d.GeoInfo?.LatitudeRange }),
+  },
+]
+
 const CWA_IMAGE_HOST = 'https://cwaopendata.s3.ap-northeast-1.amazonaws.com/'
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // same cap as the bucket
 
@@ -87,35 +105,38 @@ const range = (text: unknown) => {
   return [Number(m[1]), Number(m[2])] as const
 }
 
-async function ingestRadar() {
-  const d = (await fetchFileApi(RADAR)).cwaopendata.dataset
-  const validAt = new Date(d.DateTime)
-  if (Number.isNaN(validAt.getTime())) throw new Error(`${RADAR}: unreadable time "${d.DateTime}"`)
+async function ingestImage(spec: ImageSpec) {
+  const d = spec.read((await fetchFileApi(spec.datasetId)).cwaopendata.dataset)
+  const validAt = new Date(String(d.time))
+  if (Number.isNaN(validAt.getTime())) throw new Error(`${spec.datasetId}: unreadable time "${d.time}"`)
 
   const [existing] = await db.select({ id: weatherFrames.id }).from(weatherFrames)
-    .where(and(eq(weatherFrames.layerType, 'radar'), eq(weatherFrames.validAt, validAt)))
-  if (existing) return { layer: 'radar', time: validAt.toISOString(), stored: false }
+    .where(and(eq(weatherFrames.layerType, spec.layer), eq(weatherFrames.validAt, validAt)))
+  if (existing) return { layer: spec.layer, time: validAt.toISOString(), stored: false }
 
-  // The URL comes out of a remote document, so it is untrusted input: only ever fetch from CWA's own bucket.
-  const url = String(d.resource?.ProductURL)
-  if (!url.startsWith(CWA_IMAGE_HOST)) throw new Error(`${RADAR}: refusing to fetch image from unexpected host`)
+  // The URL comes out of a remote document, so it is untrusted input: only ever fetch from CWA's own bucket, and
+  // only store bytes that are the picture format the bucket and the browser expect.
+  const url = String(d.url)
+  if (!url.startsWith(CWA_IMAGE_HOST)) throw new Error(`${spec.datasetId}: refusing to fetch image from unexpected host`)
   const res = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' })
-  if (!res.ok) throw new Error(`${RADAR}: image responded ${res.status}`)
+  if (!res.ok) throw new Error(`${spec.datasetId}: image responded ${res.status}`)
   const image = Buffer.from(await res.arrayBuffer())
-  if (image.length === 0 || image.length > MAX_IMAGE_BYTES) throw new Error(`${RADAR}: image is ${image.length} bytes`)
+  if (image.length === 0 || image.length > MAX_IMAGE_BYTES) throw new Error(`${spec.datasetId}: image is ${image.length} bytes`)
+  const { type, magic } = FORMATS[spec.format]
+  if (!image.subarray(0, 4).toString('hex').startsWith(magic)) throw new Error(`${spec.datasetId}: image is not ${type}`)
 
-  const [minLon, maxLon] = range(d.datasetInfo.parameterSet.LongitudeRange)
-  const [minLat, maxLat] = range(d.datasetInfo.parameterSet.LatitudeRange)
-  const storagePath = framePath('radar', validAt)
-  await upload(storagePath, image)
-  await db.insert(weatherFrames).values({ layerType: 'radar', validAt, storagePath, minLon, maxLon, minLat, maxLat })
+  const [minLon, maxLon] = range(d.lonRange)
+  const [minLat, maxLat] = range(d.latRange)
+  const storagePath = framePath(spec.layer, validAt, spec.format)
+  await upload(storagePath, image, type)
+  await db.insert(weatherFrames).values({ layerType: spec.layer, validAt, storagePath, minLon, maxLon, minLat, maxLat })
     .onConflictDoNothing({ target: weatherFrames.storagePath })
-  return { layer: 'radar', time: validAt.toISOString(), stored: true, bytes: image.length }
+  return { layer: spec.layer, time: validAt.toISOString(), stored: true, bytes: image.length }
 }
 
 /** Every product is independent: one failing (CWA hiccup) must not block the others. `only` limits the run to one product. */
 export async function ingestGrids(only?: GridLayer) {
-  const jobs = [...GRIDS.map((g) => ({ layer: g.layer, run: () => ingestGrid(g) })), { layer: 'radar', run: ingestRadar }]
+  const jobs = [...GRIDS.map((g) => ({ layer: g.layer, run: () => ingestGrid(g) })), ...IMAGES.map((i) => ({ layer: i.layer, run: () => ingestImage(i) }))]
     .filter((j) => !only || j.layer === only)
   const results = await Promise.allSettled(jobs.map((j) => j.run()))
   return results.map((r, i) => r.status === 'fulfilled' ? r.value : (console.error(`ingest ${jobs[i].layer} failed:`, r.reason), { layer: jobs[i].layer, error: true }))

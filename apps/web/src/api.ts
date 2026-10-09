@@ -3,8 +3,8 @@ export type Station = { id: number; cwaStationId: string; name: string; county: 
 export type Readings = { temperature: number | null; humidity: number | null; pressure: number | null; windSpeed: number | null; windDirection: number | null; gustSpeed: number | null; rain1h: number | null; rain24h: number | null }
 export type Observation = Readings & { stationId: number; observedAt: string }
 export type GridMeta = { encoding: 'rg16'; offset: number; scale: number; unit: string; width: number; height: number }
-export type Frame = { time: string; url?: string; bounds?: [number, number, number, number]; meta?: GridMeta | null } // encoded grids only; radar is a plain picture
-export type FrameLayer = 'stations' | 'temperature-grid' | 'rain-grid' | 'radar'
+export type Frame = { time: string; url?: string; bounds?: [number, number, number, number]; meta?: GridMeta | null } // encoded grids only; radar and satellite are plain pictures
+export type FrameLayer = 'stations' | 'temperature-grid' | 'rain-grid' | 'radar' | 'satellite'
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`/api${path}`, { signal })

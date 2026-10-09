@@ -1,6 +1,6 @@
 # 臺灣天氣（Weather Taiwan）
 
-以中央氣象署（CWA）開放資料製作的 Windy 風格臺灣天氣地圖：在地圖上看溫度、雨量、雷達回波與濕度，並可回放過去 7 天。
+以中央氣象署（CWA）開放資料製作的 Windy 風格臺灣天氣地圖：在地圖上看溫度、雨量、雷達回波、衛星雲圖與濕度，並可回放過去 7 天。
 
 - 線上版：<https://a-io-t-dic-l3.vercel.app>
 - 設計文件：[DESIGN.md](DESIGN.md)（英文）
@@ -24,6 +24,7 @@
 | 溫度 | 全臺氣溫格點（僅陸地） | CWA `O-A0038-003` | 每小時 |
 | 雨量 | 過去 1 小時累積雨量（雷達估計） | CWA `O-B0045-001` | 每 10 分鐘 |
 | 雷達 | 雷達合成回波圖 | CWA `O-A0058-005` | 每 10 分鐘 |
+| 衛星 | 向日葵衛星紅外線彩色雲圖 | CWA `O-C0042-002` | 每 10 分鐘 |
 | 濕度 | 相對濕度，由測站觀測值在瀏覽器內插而成 | 測站觀測 | 每 10 分鐘 |
 
 - **測站**：全臺一千三百多個氣象站與雨量站的即時觀測（CWA `O-A0001-001`、`O-A0002-001`、`O-A0003-001`），點選可看該站讀數、一週預報與地圖時間前後 24 小時的趨勢圖。
@@ -31,7 +32,7 @@
 - **時間軸**：每個圖層都能回放過去 7 天。
 - **語言**：介面只有繁體中文。
 
-尚未完成：風場與其他圖層（衛星雲圖等），見 DESIGN.md 第 20 節。
+尚未完成：風場、閃電、颱風路徑與警特報，見 DESIGN.md 第 20 節。
 
 ## 操作說明
 
@@ -57,7 +58,7 @@
 | 前端（`apps/web`） | React 19、Vite 8、Tailwind CSS 4、MapLibre GL 6；底圖為 OpenFreeMap |
 | 後端（`apps/api`） | Hono，部署為 Vercel Functions（東京 `hnd1`） |
 | 資料庫 | Supabase Postgres，以 Drizzle ORM 定義 schema |
-| 檔案 | Supabase Storage：格點與雷達影格（PNG） |
+| 檔案 | Supabase Storage：格點、雷達與衛星影格（PNG／JPG） |
 | 排程 | Supabase Cron（`pg_cron` + `pg_net`），密鑰存放在 Supabase Vault |
 
 ```text
@@ -133,7 +134,7 @@ task db:push                       # 套用到 Supabase（會變更正式資料�
 | `GET /api/stations/:cwaId/history?from=&to=` | 該站在指定區間的觀測（預設最近 24 小時，最長 8 天） |
 | `GET /api/observations?at=` | 指定時間點各測站的最新讀數（預設為現在），對應時間軸上的一個位置 |
 | `GET /api/forecast?county=&town=` | 鄉鎮未來一週逐 12 小時預報（天氣、最高／最低溫、降雨機率），即時向氣象署查詢、不存入資料庫，CDN 快取 30 分鐘。只接受有測站的鄉鎮，其他回傳 404 |
-| `GET /api/frames?layer=&from=&to=` | 圖層的時間軸影格。`layer` 可為 `stations`、`radar`、`rain-grid`、`temperature-grid` |
+| `GET /api/frames?layer=&from=&to=` | 圖層的時間軸影格。`layer` 可為 `stations`、`radar`、`satellite`、`rain-grid`、`temperature-grid` |
 
 參數格式不正確時回傳 400 與錯誤說明。
 
@@ -142,7 +143,7 @@ task db:push                       # 套用到 Supabase（會變更正式資料�
 | 路由 | 用途 |
 |---|---|
 | `POST /api/internal/ingest/stations` | 擷取測站觀測 |
-| `POST /api/internal/ingest/grids` | 擷取溫度、雨量格點與雷達圖；加上 `?layer=` 可只抓其中一項 |
+| `POST /api/internal/ingest/grids` | 擷取溫度、雨量格點、雷達圖與衛星雲圖；加上 `?layer=` 可只抓其中一項 |
 | `POST /api/internal/backfill/stations?before=&limit=` | 從氣象署歷史 API 補回測站的每小時觀測 |
 | `POST /api/internal/prune/frames` | 刪除過期影格 |
 
@@ -151,7 +152,7 @@ task db:push                       # 套用到 Supabase（會變更正式資料�
 | 工作 | 時間（臺灣時間） | 內容 |
 |---|---|---|
 | `ingest-stations` | 每 10 分鐘（第 5、15、25… 分） | 測站觀測寫入資料庫 |
-| `ingest-grids` | 每 10 分鐘（第 8、18、28… 分） | 溫度、雨量格點與雷達圖存成影格（Storage） |
+| `ingest-grids` | 每 10 分鐘（第 8、18、28… 分） | 溫度、雨量格點、雷達圖與衛星雲圖存成影格（Storage） |
 | `ingest-radar` | 每 10 分鐘（第 3、13、23… 分） | 只抓雷達圖 |
 | `prune` | 每日 03:30 | 清理過期觀測，並記錄資料庫大小 |
 | `prune-frames` | 每日 03:40 | 刪除過期影格 |
