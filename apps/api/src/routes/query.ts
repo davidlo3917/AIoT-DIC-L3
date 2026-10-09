@@ -2,20 +2,26 @@ import { z } from 'zod'
 import { COUNTY_FORECASTS } from '../cwa/forecast.js'
 
 const instant = z.iso.datetime({ offset: true }).transform((s) => new Date(s))
+// Instants are snapped to the grid the data sits on (readings every 10 min, ranges by the hour) before they reach a
+// query: the browser already sends aligned values, and every other value would be its own CDN miss and its own
+// database query — an unbounded key space a caller could walk to keep the free-tier database busy.
+const floorTo = (d: Date, ms: number) => new Date(Math.floor(d.getTime() / ms) * ms)
+const ceilTo = (d: Date, ms: number) => new Date(Math.ceil(d.getTime() / ms) * ms)
+const HOUR = 3600e3, TEN_MINUTES = 600e3
 
 export const MAX_RANGE_DAYS = 12 // the 7-day retention window plus the wind forecast, which reaches 3.5 days ahead
 
-/** `?from=&to=` — ISO-8601 with offset. Defaults to the last 24 h ending now. */
+/** `?from=&to=` — ISO-8601 with offset, widened to whole hours. Defaults to the last 24 h ending now. */
 export const rangeQuery = z.object({ from: instant.optional(), to: instant.optional() }).transform((q, ctx) => {
-  const to = q.to ?? new Date()
-  const from = q.from ?? new Date(to.getTime() - 24 * 3600e3)
+  const to = ceilTo(q.to ?? new Date(), HOUR)
+  const from = floorTo(q.from ?? new Date(to.getTime() - 24 * HOUR), HOUR)
   if (from >= to) ctx.addIssue({ code: 'custom', message: '`from` must be before `to`' })
   if (to.getTime() - from.getTime() > MAX_RANGE_DAYS * 86400e3) ctx.addIssue({ code: 'custom', message: `range is limited to ${MAX_RANGE_DAYS} days` })
   return { from, to }
 })
 
-/** `?at=` — defaults to now. */
-export const atQuery = z.object({ at: instant.optional() }).transform((q) => ({ at: q.at ?? new Date() }))
+/** `?at=` — defaults to now; snapped down to the 10-minute observation grid. */
+export const atQuery = z.object({ at: instant.optional() }).transform((q) => ({ at: floorTo(q.at ?? new Date(), TEN_MINUTES) }))
 
 export const LAYERS = ['stations', 'radar', 'satellite', 'rain-grid', 'temperature-grid', 'wind'] as const
 export const layerQuery = z.object({ layer: z.enum(LAYERS) })

@@ -10,10 +10,10 @@ test('grid ingest takes one known product, or none for all', () => {
   assert.equal(gridsQuery.safeParse({ layer: 'stations' }).success, false) // a real layer, but not one this endpoint fetches
 })
 
-test('range defaults to the last 24 hours', () => {
-  const { from, to } = rangeQuery.parse({})
+test('range defaults to the last 24 hours, ending on the next whole hour', () => {
+  const { from, to } = rangeQuery.parse({}), now = Date.now()
   assert.equal(to.getTime() - from.getTime(), 24 * 3600e3)
-  assert.ok(Math.abs(to.getTime() - Date.now()) < 5000)
+  assert.ok(to.getTime() >= now && to.getTime() - now <= 3600e3 && to.getUTCMinutes() === 0)
 })
 
 test('range accepts Taiwan-offset timestamps and converts to the same instant', () => {
@@ -30,8 +30,17 @@ test('range rejects inverted, oversized, and non-ISO input', () => {
   assert.equal(rangeQuery.safeParse({ from: '2026-09-21 12:00' }).success, false) // no offset = ambiguous
 })
 
+test('instants snap to the data grid, so there are finitely many distinct queries', () => {
+  assert.equal(atQuery.parse({ at: '2026-10-09T05:04:56.789Z' }).at.toISOString(), '2026-10-09T05:00:00.000Z')
+  assert.equal(atQuery.parse({ at: '2026-10-09T05:19:59.999Z' }).at.toISOString(), '2026-10-09T05:10:00.000Z')
+  const { from, to } = rangeQuery.parse({ from: '2026-10-09T05:04:56Z', to: '2026-10-09T07:00:00.001Z' })
+  assert.equal(from.toISOString(), '2026-10-09T05:00:00.000Z', 'from widens down to the hour')
+  assert.equal(to.toISOString(), '2026-10-09T08:00:00.000Z', 'to widens up to the hour')
+  assert.equal(rangeQuery.parse({ from: '2026-10-09T05:00:00Z', to: '2026-10-09T06:00:00Z' }).to.toISOString(), '2026-10-09T06:00:00.000Z', 'already on the hour: unchanged')
+})
+
 test('at defaults to now; layer is a closed set', () => {
-  assert.ok(Math.abs(atQuery.parse({}).at.getTime() - Date.now()) < 5000)
+  assert.ok(Math.abs(atQuery.parse({}).at.getTime() - Date.now()) < 10 * 60e3)
   assert.equal(layerQuery.safeParse({ layer: 'radar' }).success, true)
   assert.equal(layerQuery.safeParse({ layer: 'wind' }).success, true)
   assert.equal(layerQuery.safeParse({ layer: 'radar; drop table' }).success, false)
