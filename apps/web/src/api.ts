@@ -39,5 +39,10 @@ export function getObservations(at: string): Promise<Observation[]> {
 export type ForecastPeriod = { start: string; end: string; weather: string | null; weatherCode: string | null; min: number | null; max: number | null; rainChance: number | null }
 export const getForecast = (county: string, town: string, signal?: AbortSignal) =>
   get<{ periods: ForecastPeriod[] }>(`/forecast?county=${encodeURIComponent(county)}&town=${encodeURIComponent(town)}`, signal).then((r) => r.periods)
+// Shapes mirror apps/api/src/cwa/typhoon.ts: wind in m/s, pressure in hPa, radii in km.
+export type Fix = { time: string; lon: number; lat: number; wind: number | null; gust: number | null; pressure: number | null
+  speed: number | null; direction: string | null; r15: number | null; r25: number | null; r70: number | null }
+export type Cyclone = { name: string | null; cwaName: string | null; number: string | null; td: string | null; analysis: Fix[]; forecast: Fix[] }
+export const getTyphoons = (signal?: AbortSignal) => get<{ cyclones: Cyclone[] }>('/typhoons', signal).then((r) => r.cyclones)
 /** The station's whole playback window, fetched once per card: the chart then follows the map time without refetching. */
 export const getHistory = (cwaId: string, signal?: AbortSignal) => get<{ observations: (Readings & { observedAt: string })[] }>(`/stations/${cwaId}/history?from=${since()}`, signal).then((r) => r.observations)

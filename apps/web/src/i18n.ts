@@ -56,6 +56,9 @@ export const zh = {
   'forecast.rain': '降雨機率', 'forecast.mountain': '預報為整個鄉鎮的天氣；本站海拔較高，實際氣溫通常較低。',
   'forecast.today': '今天', 'forecast.day': '白天', 'forecast.night': '晚上',
 
+  'typhoon.title': '颱風', 'typhoon.hint': '點選可查看路徑與預測', 'typhoon.td': '熱帶性低氣壓',
+  'typhoon.stats': '{pressure} hPa · {wind} m/s · {time}',
+
   'map.title': '地圖', 'map.zoomIn': '放大', 'map.zoomOut': '縮小', 'map.attribution': '地圖資料來源',
 }
 

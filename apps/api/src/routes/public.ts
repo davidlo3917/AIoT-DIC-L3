@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import type { z } from 'zod'
 import { fetchDatastore } from '../cwa/client.js'
 import { COUNTY_FORECASTS, ELEMENTS, normalizeForecast } from '../cwa/forecast.js'
+import { normalizeTyphoons, TYPHOON_DATASET } from '../cwa/typhoon.js'
 import { db } from '../db/client.js'
 import { publicUrl } from '../lib/storage.js'
 import { stationObservations as obs, stations, weatherFrames } from '../db/schema.js'
@@ -85,6 +86,12 @@ export const publicRoutes = new Hono()
     if (!periods) return c.json({ error: 'township not found' }, 404)
     c.header('Cache-Control', cache(1800))
     return c.json({ county, town, periods })
+  })
+
+  // Every active tropical cyclone with its track and forecast, straight from CWA (reissued every 3–6 h); nothing stored.
+  .get('/typhoons', async (c) => {
+    c.header('Cache-Control', cache(600))
+    return c.json({ cyclones: normalizeTyphoons(await fetchDatastore(TYPHOON_DATASET, {}, 10_000)) })
   })
 
   // The timeline's one contract: every layer answers "which instants do you have?" in the same shape.

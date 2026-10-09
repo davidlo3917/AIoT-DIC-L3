@@ -92,7 +92,9 @@ Station data:
 
 The three station datasets overlap (2,581 records, 1,365–1,367 unique stations); later datasets win on metadata. CWA publishes observations about 15 minutes late, and the radar picture 8–10 minutes after its frame time.
 
-Not built: wind, lightning, typhoon, warnings (§20).
+Typhoons (`W-C0034-005`, every active tropical cyclone with CWA's past fixes, wind radii and forecast positions) are not a layer but an overlay drawn over whichever layer is up, proxied live like the forecast (§7, §13).
+
+Not built: wind, lightning, warnings (§20).
 
 ---
 
@@ -201,6 +203,7 @@ All public routes are read-only `GET`s under `/api`, JSON, and every response ca
 | `GET /api/stations/:cwaId/history?from=&to=` | one station's observations in the range (default last 24 h, max 8 days) | 60 s |
 | `GET /api/observations?at=` | every station's reading at one instant: per field, the newest non-null value in the 100 min before `at` (stations report at different cadences) | 60 s |
 | `GET /api/forecast?county=&town=` | a township's 12-hourly periods for the coming week; proxied live from CWA, nothing stored; only townships that have a station are accepted | 30 min |
+| `GET /api/typhoons` | every active tropical cyclone: past fixes, the current one with 15/25 m/s wind radii, forecast fixes with the 70 % probability radius; proxied live from CWA, nothing stored | 10 min |
 | `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `satellite`, `rain-grid` or `temperature-grid` | 60 s |
 
 The **frames contract** is the one shape every layer answers in. Station frames are a synthetic 10-minute grid clipped to what is stored (no URL: the browser asks `/observations` per frame). Grid and picture frames carry the Storage URL and the WGS84 bounds; encoded grids also carry their decoding recipe in `meta`.
@@ -342,6 +345,8 @@ layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 
 
 **Stations.** Drawn as a GeoJSON source with a circle layer (colour from the ramp) and a symbol layer (the value). Zoomed out, only the most relevant stations are shown at least 44 px apart; each zoom level from 5 to 11 adds the next most relevant ones that fit, computed once per frame in `minZooms()` and stored as a per-feature `minzoom` that the layer filter compares with the zoom. Relevance: staffed stations (`46…`) before automatic (`C0…`) before the rest, lower elevation first (the town over the peak above it); for rain, the wettest first, and dry gauges are not drawn at all. Labels blinked ~400 ms per step until two fixes: the map's `fadeDuration` is 0 (a label whose text changed counts as new and would fade in), and the previous frame's stations stay up until the next frame's replace them. The same keep-until-replaced rule holds for the station card, which otherwise blanked on every playback step.
 
+**Typhoons.** One GeoJSON source holds, per cyclone, the past track (solid), the forecast track (dashed), the fixes as dots (the current one orange and named, forecast ones labelled with their time), the 15 and 25 m/s wind radii at the current fix and the 70 % probability circles ahead; circles are 48-point rings on an equirectangular approximation. It sits above the weather and the coast clip (a track crosses the sea) and below the stations. The list is refetched every 10 minutes on its own clock. Storms are usually far off-screen, so a chip under the layer list names each one; tapping it fits the track into the part of the screen the panels leave free, or centres the storm where the whole track cannot fit. The map's bounds were widened to CWA's basin (100–180°E, 0–50°N) for this.
+
 **Preloading.** Two frames ahead are fetched and decoded during playback so the network is not in the loop.
 
 ---
@@ -453,7 +458,7 @@ Facts worth knowing:
 | Feature | Status | Shape of the work |
 |---|---|---|
 | Wind particles | not started | CWA WRF GRIB2 → GitHub Actions + Python (ecCodes/cfgrib) → U/V field files in Storage → WebGL particle layer; the frames contract already fits |
-| Lightning, typhoon tracks, warnings | not started | datastore ingestion + point/line/polygon layers; the tables designed for them were dropped on 2026-10-09 so the schema matches what runs |
+| Lightning, warnings | not started | lightning: KMZ ingestion into a table (the placemark format is unseen until a strike happens) + point layer on the station clock; warnings: `W-C0033-001` per-county proxy + county polygons (a static asset) + a list; the tables once designed for them were dropped on 2026-10-09 so the schema matches what runs |
 
 ---
 
@@ -467,6 +472,7 @@ Facts worth knowing:
 - **2026-10-05** TLS enforced on the database, WAF rate limit added, README rewritten in zh-TW.
 - **2026-10-09** Chinese-only UI; stations on by default and thinned by zoom; label and card flicker fixed with keep-until-replaced; township forecast added as a live proxy; 7-day playback; four speculative tables and unused API fields removed; security headers, dependency overrides and CI pins added; this document rewritten as-built.
 - **2026-10-09** Satellite layer shipped: the radar ingest became a list of picture products (format, signature and JSON shape per product), and the legend learned to show a picture layer that has no scale.
+- **2026-10-09** Typhoon tracks shipped as a live proxy plus an overlay, not a layer with history: CWA's document already carries the past track, so storing versions would only pay off for a "forecast vs. actual" feature nobody asked for.
 
 ---
 

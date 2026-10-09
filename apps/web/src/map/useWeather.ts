@@ -1,12 +1,13 @@
 import type { CanvasSource, Map as MapLibreMap } from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
-import { getFrames, getObservations, type Frame, type Station } from '../api'
+import { getFrames, getObservations, getTyphoons, type Frame, type Station } from '../api'
 import { LAYERS } from '../layers'
 import { STATUS, type Status } from '../status'
 import { actions, currentFrame, useStore } from '../timeline/store'
 import { loadField, loadImage, paint, type Field } from './layers/grid'
 import { idw } from './layers/idw'
 import { addStationLayers, updateStations, setStationsVisible } from './layers/stations'
+import { addTyphoonLayers, cycloneBounds, updateTyphoons } from './layers/typhoon'
 import { REFERENCE_LAYER } from './basemap'
 
 const SURFACE = 'surface'
@@ -47,6 +48,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     map.addLayer({ id: SURFACE, type: 'raster', source: SURFACE, paint: { 'raster-opacity': 0, 'raster-opacity-transition': { duration: 0, delay: 0 }, 'raster-fade-duration': 0, 'raster-resampling': 'linear' } }, firstLabel)
     const water = map.getStyle().layers.find((l) => l.id === 'water')
     if (water?.type === 'fill') map.addLayer({ ...water, id: COAST, paint: { 'fill-color': map.getPaintProperty('water', 'fill-color') as string } }, firstLabel)
+    const removeTyphoons = addTyphoonLayers(map) // over the weather and the coast clip (a track crosses the sea), under the stations
     const removeStations = addStationLayers(map, actions.selectStation)
     return () => {
       cancelAnimationFrame(surface.raf)
@@ -54,6 +56,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
       surface.finish = null
       ;(map.getSource(SURFACE) as CanvasSource | undefined)?.pause()
       removeStations()
+      removeTyphoons()
       for (const id of [COAST, SURFACE]) if (map.getLayer(id)) map.removeLayer(id)
       if (map.getSource(SURFACE)) map.removeSource(SURFACE)
     }
@@ -217,6 +220,31 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     })
     return () => { alive = false }
   }, [map, frame, layer.stations, stations, showStations, refreshKey])
+
+  // Active typhoons: fetched on their own clock (CWA reissues every 3–6 h), drawn whatever layer is up. A failed fetch
+  // keeps whatever was drawn; there is no status for it, the chip simply does not appear.
+  const typhoons = useStore((s) => s.typhoons), typhoonFocus = useStore((s) => s.typhoonFocus)
+  useEffect(() => {
+    const ac = new AbortController()
+    const load = () => getTyphoons(ac.signal).then(actions.setTyphoons, () => {})
+    load()
+    const timer = setInterval(load, 10 * 60e3)
+    return () => { ac.abort(); clearInterval(timer) }
+  }, [refreshKey])
+  useEffect(() => { if (map) updateTyphoons(map, typhoons) }, [map, typhoons])
+  useEffect(() => {
+    const cyclone = typhoonFocus && typhoons[typhoonFocus.index], bounds = cyclone && cycloneBounds(cyclone)
+    if (!map || !bounds) return
+    // Keep the track out from under the panels: the sidebar on roomy screens, the layer row and chip above and the
+    // legend and timeline below on compact ones. Where the whole track cannot fit (a phone, or one on its side), the
+    // storm itself is centred in the free part of the screen instead.
+    const desk = window.matchMedia('(min-width: 640px) and (min-height: 640px)').matches
+    const padding = desk ? { left: 330, top: 40, right: 40, bottom: 230 } : { left: 24, top: 270, right: 24, bottom: 300 }
+    const camera = map.cameraForBounds(bounds, { padding, maxZoom: 7 })
+    const now = cyclone.analysis.at(-1) ?? cyclone.forecast[0]
+    if (camera && camera.zoom! >= map.getMinZoom()) map.flyTo(camera)
+    else if (now) map.flyTo({ center: [now.lon, now.lat], zoom: map.getMinZoom(), padding })
+  }, [map, typhoonFocus]) // not `typhoons`: a refreshed list must not fly the viewer back
 
   // Warm the caches two frames ahead so playback doesn't stutter on the network.
   const frames = useStore((s) => s.frames), index = useStore((s) => s.index)

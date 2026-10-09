@@ -13,9 +13,6 @@ setWorkerUrl(workerUrl)
 // Reuse the provider's sources and place filters; basemap.ts selects and restyles only weather-relevant context.
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/fiord'
 
-// Taiwan + surrounding sea; matches the radar crop so layers never end mid-screen at min zoom.
-const BOUNDS: [number, number, number, number] = [115, 17.75, 126.5, 29.25]
-
 export default function MapView({ stations, onStatus }: { stations: Station[]; onStatus: (s: Status) => void }) {
   const el = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<MapLibreMap | null>(null)
@@ -27,7 +24,7 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
       center: [120.97, 23.7],
       zoom: 6.5,
       minZoom: 4,
-      maxBounds: [BOUNDS[0] - 10, BOUNDS[1] - 8, BOUNDS[2] + 10, BOUNDS[3] + 8],
+      maxBounds: [100, 0, 180, 50], // CWA's whole typhoon basin: a track usually starts far out in the Pacific
       // A label whose text changes (25.0 → 25.3) counts as a new one, and would fade in from nothing on every frame.
       fadeDuration: 0,
       attributionControl: false, // added below, top-right: the default bottom corner sits under the timeline

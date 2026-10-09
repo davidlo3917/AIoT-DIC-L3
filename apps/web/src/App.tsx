@@ -3,6 +3,7 @@ import { getStations, type Station } from './api'
 import LayerPanel, { StationsToggle } from './components/LayerPanel'
 import Legend from './components/Legend'
 import StationCard from './components/StationCard'
+import Typhoons from './components/Typhoons'
 import { t } from './i18n'
 import MapView from './map/MapView'
 import { STATUS, type Status } from './status'
@@ -39,6 +40,7 @@ export default function App() {
               layer list, so the station card on the other side can reach down to the timeline. */}
           <div className="flex min-h-0 min-w-0 shrink-0 flex-col pr-14 sm:pr-0">
             <LayerPanel />
+            <Typhoons />
             <div className="mt-auto hidden pt-2 desk:block"><Legend /></div>
           </div>
           <div className="mt-auto flex min-h-0 min-w-0 flex-col sm:mr-16 sm:mt-0 sm:ml-auto"><StationCard key={selectedStation} stations={stations} /></div>
