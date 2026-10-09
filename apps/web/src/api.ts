@@ -1,9 +1,9 @@
 // Shapes mirror apps/api/src/routes/public.ts.
 export type Station = { id: number; cwaStationId: string; name: string; county: string | null; town: string | null; latitude: number; longitude: number; elevation: number | null }
 export type Readings = { temperature: number | null; humidity: number | null; pressure: number | null; windSpeed: number | null; windDirection: number | null; gustSpeed: number | null; rain1h: number | null; rain24h: number | null }
-export type Observation = Readings & { stationId: number; observedAt: string }
-export type GridMeta = { encoding: 'rg16'; offset: number; scale: number; unit: string; width: number; height: number }
-export type WindMeta = { encoding: 'uv8'; width: number; height: number; unit: string; run: string; hour: number } // mirrors ingestion/wind.ts
+export type Observation = Readings & { stationId: number }
+type GridMeta = { encoding: 'rg16'; offset: number; scale: number; width: number; height: number }
+type WindMeta = { encoding: 'uv8'; width: number; height: number; run: string } // mirrors ingestion/wind.ts
 export type Frame = { time: string; url?: string; bounds?: [number, number, number, number]; meta?: GridMeta | WindMeta | null // encoded grids only; radar and satellite are plain pictures
   between?: [Frame, Frame, number] } // browser only: an hourly wind frame blended from the two CWA frames around it, this far from the first
 export type FrameLayer = 'stations' | 'temperature-grid' | 'rain-grid' | 'radar' | 'satellite' | 'wind'
@@ -15,7 +15,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 export const PLAYBACK_DAYS = 7 // what the database keeps
-export const FORECAST_DAYS = 4 // the wind forecast reaches 3.5 days ahead
+const FORECAST_DAYS = 4 // the wind forecast reaches 3.5 days ahead
 // The ends of the playback window, rounded down to the hour so every visitor in that hour asks the CDN the same URL.
 const hour = (days: number) => new Date(Math.floor((Date.now() + days * 86400e3) / 3600e3) * 3600e3).toISOString()
 
@@ -41,13 +41,12 @@ export function getObservations(at: string): Promise<Observation[]> {
   }
   return hit
 }
-export type ForecastPeriod = { start: string; end: string; weather: string | null; weatherCode: string | null; min: number | null; max: number | null; rainChance: number | null }
+export type ForecastPeriod = { start: string; end: string; weather: string | null; min: number | null; max: number | null; rainChance: number | null }
 export const getForecast = (county: string, town: string, signal?: AbortSignal) =>
   get<{ periods: ForecastPeriod[] }>(`/forecast?county=${encodeURIComponent(county)}&town=${encodeURIComponent(town)}`, signal).then((r) => r.periods)
 // Shapes mirror apps/api/src/cwa/typhoon.ts: wind in m/s, pressure in hPa, radii in km.
-export type Fix = { time: string; lon: number; lat: number; wind: number | null; gust: number | null; pressure: number | null
-  speed: number | null; direction: string | null; r15: number | null; r25: number | null; r70: number | null }
-export type Cyclone = { name: string | null; cwaName: string | null; number: string | null; td: string | null; analysis: Fix[]; forecast: Fix[] }
+export type Fix = { time: string; lon: number; lat: number; wind: number | null; pressure: number | null; r15: number | null; r25: number | null; r70: number | null }
+export type Cyclone = { name: string | null; cwaName: string | null; analysis: Fix[]; forecast: Fix[] }
 export const getTyphoons = (signal?: AbortSignal) => get<{ cyclones: Cyclone[] }>('/typhoons', signal).then((r) => r.cyclones)
 // Shapes mirror apps/api/src/cwa/warnings.ts.
 export type Warning = { phenomena: string; significance: string; start: string; end: string; counties: string[]; text: string | null }

@@ -22,8 +22,7 @@ const newestNonNull = sql.join(READINGS.map((col) =>
 
 function readingsAt(at: Date) {
   return db.execute(sql`
-    select station_id as "stationId", ${newestNonNull},
-      to_char(max(observed_at) at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "observedAt" -- same ISO shape drizzle gives /history
+    select station_id as "stationId", ${newestNonNull}
     from station_observations
     where observed_at <= ${at.toISOString()}::timestamptz
       and observed_at > ${at.toISOString()}::timestamptz - make_interval(mins => ${LOOKBACK_MINUTES})
@@ -40,10 +39,7 @@ export const parse = <S extends z.ZodType>(schema: S, input: unknown, what = 'qu
 // Public data, identical for every visitor: let Vercel's CDN absorb the traffic instead of the free-tier database.
 const cache = (seconds: number) => `public, s-maxage=${seconds}, stale-while-revalidate=${seconds * 5}`
 
-const stationColumns = {
-  id: stations.id, cwaStationId: stations.cwaStationId, name: stations.name, county: stations.county,
-  town: stations.town, latitude: stations.latitude, longitude: stations.longitude, elevation: stations.elevation,
-}
+const { createdAt, updatedAt, ...stationColumns } = getTableColumns(stations)
 
 const findStation = async (raw: string) => {
   const cwaId = parse(stationIdParam, raw, 'station id')

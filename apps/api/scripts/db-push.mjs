@@ -1,4 +1,4 @@
-// Applies supabase/migrations with the Supabase CLI. Pass extra flags through, e.g. `pnpm db:push --dry-run`.
+// Applies supabase/migrations with the Supabase CLI. Extra flags pass through (`task db:plan` sends --dry-run).
 import { spawnSync } from 'node:child_process'
 
 // Migrations can't run through the transaction pooler (6543); the session pooler is the same host on 5432.

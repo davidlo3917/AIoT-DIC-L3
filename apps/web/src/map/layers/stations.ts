@@ -1,9 +1,9 @@
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
-import type { Observation, Station } from '../../api'
+import type { Observation, Readings, Station } from '../../api'
 import { mapExpression, RAMPS, type Variable } from '../../ramps'
 
 const SOURCE = 'stations', DOTS = 'station-dots', LABELS = 'station-values'
-const FIELD: Record<Variable, keyof Observation> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h', wind: 'windSpeed' }
+export const FIELD: Record<Variable, keyof Readings> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h', wind: 'windSpeed' }
 /** On the map the unit is a sign after the number: 28.3°, 85%, 12.0 mm, 5.1 m/s (the legend and the card spell it out). */
 export const sign = (unit: string) => unit === '°C' ? '°' : unit === '%' ? '%' : ` ${unit}`
 // Zoomed out, only the most relevant stations are drawn, at least SPACING px apart; each zoom level in adds the next

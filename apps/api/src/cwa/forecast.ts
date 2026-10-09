@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { num } from './stations.js'
 
 /** Each county's "townships, 1 week, every 12 h" dataset (F-D0047-003 … -087, every fourth id), checked live 2026-10-09. */
 export const COUNTY_FORECASTS = {
@@ -18,10 +19,7 @@ const response = z.object({ records: z.object({ Locations: z.array(z.object({ Lo
   WeatherElement: z.array(z.object({ ElementName: z.string(), Time: z.array(z.object({ StartTime: z.string(), EndTime: z.string(), ElementValue: z.array(value) })) })),
 })) })) }) })
 
-export type ForecastPeriod = { start: string; end: string; weather: string | null; weatherCode: string | null; min: number | null; max: number | null; rainChance: number | null }
-
-// CWA writes "-" where it has no number (the rain chance for days 4–7).
-const int = (s: string | undefined) => s != null && /^-?\d+$/.test(s.trim()) ? Number(s) : null
+export type ForecastPeriod = { start: string; end: string; weather: string | null; min: number | null; max: number | null; rainChance: number | null }
 
 /** One township's periods in time order, or null when CWA does not know the township. */
 export function normalizeForecast(raw: unknown): ForecastPeriod[] | null {
@@ -32,8 +30,8 @@ export function normalizeForecast(raw: unknown): ForecastPeriod[] | null {
   const periods = location.WeatherElement.find((e) => e.ElementName === '天氣現象')?.Time ?? []
   return periods.map(({ StartTime, EndTime }) => ({
     start: new Date(StartTime).toISOString(), end: new Date(EndTime).toISOString(),
-    weather: weather.get(StartTime)?.Weather ?? null, weatherCode: weather.get(StartTime)?.WeatherCode ?? null,
-    min: int(min.get(StartTime)?.MinTemperature), max: int(max.get(StartTime)?.MaxTemperature),
-    rainChance: int(rain.get(StartTime)?.ProbabilityOfPrecipitation),
+    weather: weather.get(StartTime)?.Weather ?? null,
+    min: num(min.get(StartTime)?.MinTemperature), max: num(max.get(StartTime)?.MaxTemperature),
+    rainChance: num(rain.get(StartTime)?.ProbabilityOfPrecipitation), // CWA writes "-" for days 4–7; num reads that as null
   }))
 }

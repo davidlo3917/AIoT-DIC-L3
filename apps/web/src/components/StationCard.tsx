@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { getForecast, getHistory, getObservations, type ForecastPeriod, type Observation, type Readings, type Station } from '../api'
 import { dayTime, monthDay, t, weekday } from '../i18n'
 import { LAYERS } from '../layers'
-import { RAMPS, type Variable } from '../ramps'
+import { FIELD } from '../map/layers/stations'
+import { RAMPS } from '../ramps'
 import { actions, currentFrame, useStore } from '../timeline/store'
 import Sparkline from './Sparkline'
-import { forecastDays, stationSnapshot, weatherIcon, type ForecastDay } from './chartData'
+import { forecastDays, weatherIcon, type ForecastDay } from './chartData'
 
 type Row = Readings & { observedAt: string }
-const FIELD: Record<Variable, keyof Readings> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h', wind: 'windSpeed' }
 const MOUNTAIN_M = 1000 // above this a station reads well below its township's forecast (玉山 sits in 信義鄉)
 const DAY = 86400e3
 
@@ -24,7 +24,7 @@ export default function StationCard({ stations }: { stations: Station[] }) {
     if (!station || !frame) return
     let alive = true
     getObservations(frame.time).then(
-      (observations) => { if (alive) setSnapshot({ time: frame.time, value: stationSnapshot(observations, station.id) }) },
+      (observations) => { if (alive) setSnapshot({ time: frame.time, value: observations.find((o) => o.stationId === station.id) ?? null }) },
       () => { if (alive) setSnapshot({ time: frame.time, value: null, error: true }) },
     )
     return () => { alive = false }

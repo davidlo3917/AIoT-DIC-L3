@@ -9,7 +9,7 @@ const fx = JSON.parse(readFileSync(new URL('./fixtures/forecast-tianzhong.json',
 test('township forecast: periods in order, elements joined by time', () => {
   const periods = normalizeForecast(fx)!
   assert.equal(periods.length, 14)
-  assert.deepEqual(periods[0], { start: '2026-10-09T04:00:00.000Z', end: '2026-10-09T10:00:00.000Z', weather: '晴時多雲', weatherCode: '02', min: 28, max: 33, rainChance: 0 })
+  assert.deepEqual(periods[0], { start: '2026-10-09T04:00:00.000Z', end: '2026-10-09T10:00:00.000Z', weather: '晴時多雲', min: 28, max: 33, rainChance: 0 })
   assert.equal(periods[1].min, 23)
 })
 

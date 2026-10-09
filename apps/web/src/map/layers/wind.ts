@@ -21,7 +21,6 @@ export function hourly(frames: Frame[]): Frame[] {
 
 /** The field `t` of the way from `a` to `b`: u and v blended, the speed that of the blended vector; a cell missing in either is missing. */
 export function blend(a: WindField, b: WindField, t: number): WindField {
-  if (a.width !== b.width || a.height !== b.height) return t < 0.5 ? a : b // never happens (one grid); nearest rather than garbage if it did
   const n = a.u.length, u = new Float32Array(n), v = new Float32Array(n), values = new Float32Array(n)
   for (let i = 0; i < n; i++) {
     u[i] = a.u[i] + (b.u[i] - a.u[i]) * t

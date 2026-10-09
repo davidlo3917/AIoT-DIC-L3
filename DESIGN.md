@@ -206,14 +206,14 @@ All public routes are read-only `GET`s under `/api`, JSON, and every response ca
 |---|---|---|
 | `GET /api/health` | `{ ok, db }` — database reachable? | none |
 | `GET /api/stations` | all stations: id, CWA id, name, county, town, WGS84 position, elevation | 1 h |
-| `GET /api/stations/:cwaId/history?from=&to=` | one station's observations in the range (default last 24 h, max 8 days) | 60 s |
+| `GET /api/stations/:cwaId/history?from=&to=` | one station's observations in the range (default last 24 h, max 12 days; instants snapped to whole hours) | 60 s |
 | `GET /api/observations?at=` | every station's reading at one instant: per field, the newest non-null value in the 100 min before `at` (stations report at different cadences) | 60 s |
 | `GET /api/forecast?county=&town=` | a township's 12-hourly periods for the coming week; proxied live from CWA, nothing stored; only townships that have a station are accepted | 30 min |
 | `GET /api/warnings` | the county advisories in force: phenomenon, period, the counties under it and CWA's text; proxied live, nothing stored | 5 min |
 | `GET /api/typhoons` | every active tropical cyclone: past fixes, the current one with 15/25 m/s wind radii, forecast fixes with the 70 % probability radius; proxied live from CWA, nothing stored | 10 min |
 | `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `satellite`, `rain-grid`, `temperature-grid` or `wind`; a range of up to 12 days | 60 s |
 
-The **frames contract** is the one shape every layer answers in. Station frames are a synthetic 10-minute grid clipped to what is stored (no URL: the browser asks `/observations` per frame). Grid and picture frames carry the Storage URL and the WGS84 bounds; encoded grids also carry their decoding recipe in `meta`. Wind frames are the same shape with times that run past now (the browser asks for `to` = now + 4 days for that layer only) and a `meta` that also names the model run and lead time.
+The **frames contract** is the one shape every layer answers in. Station frames are a synthetic 10-minute grid clipped to what is stored (no URL: the browser asks `/observations` per frame). Grid and picture frames carry the Storage URL and the WGS84 bounds; encoded grids also carry their decoding recipe in `meta`. Wind frames are the same shape with times that run past now (the browser asks for `to` = now + 4 days for that layer only) and a `meta` that also names the model run.
 
 Internal routes are `POST`, require `Authorization: Bearer $INGESTION_SECRET`, and are called by Supabase Cron:
 
@@ -273,7 +273,7 @@ wind/2026/10/09/0000Z/006.png             run 00Z, lead time +6 h: ~130 KB (the 
 
 **rg16 encoding.** A float grid becomes a PNG whose pixels carry the value, not a colour: `value16 = round((v + offset) × scale)`, red = high byte, green = low byte, alpha = 255 where valid and 0 for "no data" (sea, outside coverage). Temperature uses offset 50 / scale 100 (0.01 °C steps), rain offset 0 / scale 10 (0.1 mm steps). The recipe is stored in `metadata_json` and returned as `meta`, so the browser decodes any frame without knowing the layer. Colouring happens in the browser, which means a ramp can change without re-ingesting anything.
 
-**uv8 encoding (wind).** A 400 × 334 lat/lon crop of the WRF field, 115–127°E / 19–29°N at 0.03° (the model's own 3 km spacing), values at cell centres, north-up: red = (u + 64) × 2, green = (v + 64) × 2 (0.5 m/s steps, ±64 m/s), blue = speed × 4 (0.25 m/s steps to 63.75), alpha 255 (0 outside the model domain, which the crop never leaves). `meta` carries `{ encoding: 'uv8', width, height, unit, run, hour }`. The browser reads u and v for the particles and the speed for the colour. Half a metre per second is below what a map shows and a quarter of the station readings' resolution.
+**uv8 encoding (wind).** A 400 × 334 lat/lon crop of the WRF field, 115–127°E / 19–29°N at 0.03° (the model's own 3 km spacing), values at cell centres, north-up: red = (u + 64) × 2, green = (v + 64) × 2 (0.5 m/s steps, ±64 m/s), blue = speed × 4 (0.25 m/s steps to 63.75), alpha 255 (0 outside the model domain, which the crop never leaves). `meta` carries `{ encoding: 'uv8', width, height, run }`. The browser reads u and v for the particles and the speed for the colour. Half a metre per second is below what a map shows and a quarter of the station readings' resolution.
 
 **Reading the GRIB2.** CWA's WRF file is 78 messages of one Lambert conformal grid (template 3.30: 1158 × 673, LoV 120°E, standard parallels 10° and 40°, 3 km), all in 24-bit simple packing (template 5.0) without a bitmap, and the 10 m U and V are two of them. The file is never downloaded: the first 256 bytes of each message are read by HTTP `Range` until both wind messages are found (they are the 67th and 68th, but one accumulated-rain message and a few 8-bit ones shift their offsets between files; the previous file's offsets are tried first and usually hit), then their two 2.3 MB data sections. Every read after the first carries `If-Match` with the file's ETag, so a file CWA replaces mid-way answers 412 and the lead time waits for the next call instead of mixing two runs. `lib/grib.ts` parses sections 0–6, unpacks any bit width, and projects latitude/longitude onto the grid with Snyder's secant-cone formulas; the sampling of the crop is bilinear. Every length is bounded (message ≤ 64 MB, data ≤ 4 MB, ≤ 4 M points, sections within the bytes read) and anything but this one shape throws. One finding: GRIB says "shape 6" (a 6,371,229 m sphere), but WRF runs on 6,370,000 m, and only with that radius does CWA's documented far corner land on the last grid point — the difference is 0.2 cells, or 600 m, at the far corner.
 
@@ -441,7 +441,7 @@ What is in place, and what it protects against:
 |---|---|
 | CWA key and database password exist only in the API's environment; the browser bundle contains no key or Supabase URL | §17 |
 | Internal routes: `Authorization: Bearer` only (query tokens ignored), timing-safe compare, fail closed when unconfigured | `middleware/ingestAuth.ts` |
-| Every query parameter validated with zod before it reaches SQL, logs or CWA: ISO instants, 8-day range cap, station id `^[A-Za-z0-9]{4,12}$`, county from a fixed list, township shape **and** must belong to a station | `routes/query.ts`, `routes/public.ts` |
+| Every query parameter validated with zod before it reaches SQL, logs or CWA: ISO instants snapped to the data's grid (10 min for `at`, whole hours for ranges), 12-day range cap, station id `^[A-Za-z0-9]{4,12}$`, county from a fixed list, township shape **and** must belong to a station | `routes/query.ts`, `routes/public.ts` |
 | All SQL parameterised through Drizzle; the one `sql.raw` uses hard-coded column names | `routes/public.ts` |
 | The forecast proxy cannot be pointed elsewhere: fixed host, dataset from the county map, township URL-encoded | `cwa/client.ts`, `cwa/forecast.ts` |
 | The radar and satellite fetches only follow CWA's own S3 host, no redirects, 5 MB cap, PNG/JPEG signature checked | `ingestion/grids.ts` |
@@ -452,12 +452,13 @@ What is in place, and what it protects against:
 | Vercel WAF rate limit on `/api` (~600 requests/min per IP → 403) | Vercel dashboard |
 | CI: read-only token, actions pinned to SHAs; pnpm: no package younger than 7 days, no git/tarball sub-dependencies, overrides for advisories in build-only tools; `pnpm audit` clean | `.github/workflows/ci.yml`, `pnpm-workspace.yaml` |
 | GitHub secret scanning, push protection and Dependabot alerts on; nothing sensitive in the history (gitleaks) | repository settings |
+| Scanned 2026-10-09 (twice): gitleaks, semgrep (typescript, javascript, react, nodejs, secrets, owasp-top-ten, github-actions packs), `pnpm audit`, osv-scanner, trivy — no findings; a trust-boundary review found two low items, the query snapping above (fixed) and the certificate limit below | — |
 
 Known limits, accepted for this project:
 
 - The API connects as the database owner. A dedicated role with `SELECT/INSERT/DELETE` on three tables would contain a future injection; there is none today.
-- `ssl: 'require'` encrypts but does not verify Supabase's certificate (`ssl: { ca }` would).
-- Any distinct query string is a CDN miss; queries are indexed and bounded, and the WAF caps volume, so this is a load question, not a data one.
+- `ssl: 'require'` encrypts but does not verify Supabase's certificate. The pooler's chain ends in Supabase's own CA (measured 2026-10-09: `verify-full` fails with `SELF_SIGNED_CERT_IN_CHAIN`), so verification needs the CA file from the dashboard's database settings passed as `ssl: { ca }` in `db/client.ts` and `sslrootcert` in the scripts; until then an active man-in-the-middle on the Vercel–Supabase path could read traffic. Not a passive risk.
+- Any distinct query string is a CDN miss, so instants are snapped to the data's grid before they are used (`routes/query.ts`): the set of distinct queries is finite, and a caller walking milliseconds hits the CDN, not the database. Queries are indexed and bounded, and the WAF caps volume.
 - Supabase's Data API is enabled but unused; RLS is what keeps it empty. Turning it off in the dashboard removes the dependency on remembering RLS for new tables.
 
 ---
@@ -498,6 +499,7 @@ Facts worth knowing:
 - **2026-10-09** Typhoon tracks shipped as a live proxy plus an overlay, not a layer with history: CWA's document already carries the past track, so storing versions would only pay off for a "forecast vs. actual" feature nobody asked for.
 - **2026-10-09** County advisories shipped the same way. County polygons come from taiwan-atlas rather than g0v's twgeojson (2010 names, 766 split geometries) and are simplified on the TopoJSON arcs, so shared borders stay shared and neighbouring counties never show slivers.
 - **2026-10-09** Wind shipped from the API itself rather than the planned GitHub Actions + ecCodes pipeline: probing the WRF file with range requests showed one Lambert grid, plain 24-bit simple packing and no bitmap, which a 120-line reader handles, so no Python, no Actions and no secrets outside the platform. The timeline gained a forecast: "latest" became the last frame at or before now, and frames may lie ahead of it. Particles went on a 2D canvas instead of WebGL — a few thousand segments a frame need no shader.
+- **2026-10-09** Evening review pass: query instants snapped to the data grid (an unbounded CDN key space was the one load finding of the security review); station labels carry their unit and the station spacing grew to 56 px after measuring one label in eight lost to collisions; a repo-wide audit cut unused fields the typhoon and forecast proxies shipped, duplicated helpers and the pnpm-script layer under the Taskfile.
 - **2026-10-09** Wind timeline made hourly by blending the 6-hourly frames in the browser (what the plan called the shader lerp, done in a loop of 134k cells instead), and the particle canvas moved under the labels by showing it as a canvas source pinned to the view rather than a `CustomLayerInterface`: the source MapLibre already has does the upload and the ordering.
 
 ---

@@ -35,4 +35,4 @@ nav button:focus-visible { outline-offset: -2px; } /* the layer list scrolls whe
 .maplibregl-ctrl-attrib.maplibregl-compact { min-width: 44px; min-height: 44px; padding: 0; color: var(--muted); }
 .maplibregl-ctrl-attrib.maplibregl-compact-show { padding: 8px 48px 8px 10px; }
 .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button { background-color: #94a3b8; } /* stays visible as the way to close it */
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; } }

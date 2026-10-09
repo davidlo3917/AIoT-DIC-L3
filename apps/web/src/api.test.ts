@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { getObservations, invalidateObservations, type Observation } from './api'
-import { stationSnapshot } from './components/chartData'
 
-const row = (temperature: number): Observation => ({ stationId: 42, observedAt: '2020-01-01T00:00:00.000Z', temperature,
+const row = (temperature: number): Observation => ({ stationId: 42, temperature,
   humidity: 75, pressure: null, windSpeed: null, windDirection: null, gustSpeed: null, rain1h: null, rain24h: null })
 const response = (observations: Observation[]) => Response.json({ observations })
 
@@ -14,9 +13,9 @@ test('map and station card share each selected-time request, and a new time gets
   const time1 = '2020-01-01T00:00:00.000Z', time2 = '2020-01-01T01:00:00.000Z'
   const map = getObservations(time1), card = getObservations(time1)
   assert.equal(map, card)
-  assert.equal(stationSnapshot(await card, 42)?.temperature, 20)
-  assert.equal(stationSnapshot(await getObservations(time2), 42)?.temperature, 25)
-  assert.equal(stationSnapshot(await card, 999), null)
+  assert.equal((await card).find((o) => o.stationId === 42)?.temperature, 20)
+  assert.equal((await getObservations(time2)).find((o) => o.stationId === 42)?.temperature, 25)
+  assert.equal((await card).find((o) => o.stationId === 999), undefined)
   assert.deepEqual(urls, [time1, time2].map((time) => `/api/observations?at=${encodeURIComponent(time)}`))
 })
 

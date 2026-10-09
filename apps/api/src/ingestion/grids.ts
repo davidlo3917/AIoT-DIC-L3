@@ -16,7 +16,7 @@ type GridSpec = {
   datasetId: string
   read: (dataset: any) => { content: string; time: string; west: number; south: number; res: number; width: number; height: number }
   isValid: (v: number) => boolean
-  encoding: Pick<GridEncoding, 'offset' | 'scale' | 'unit'>
+  encoding: Pick<GridEncoding, 'offset' | 'scale'>
 }
 
 const GRIDS: GridSpec[] = [
@@ -28,7 +28,7 @@ const GRIDS: GridSpec[] = [
       west: Number(d.GeoInfo.BottomLeftLongitude), south: Number(d.GeoInfo.BottomLeftLatitude),
     }),
     isValid: (v) => v > -90,
-    encoding: { offset: 50, scale: 100, unit: '°C' }, // −50…605 °C at 0.01° steps
+    encoding: { offset: 50, scale: 100 }, // −50…605 °C at 0.01° steps
   },
   {
     layer: 'rain-grid',
@@ -42,7 +42,7 @@ const GRIDS: GridSpec[] = [
       }
     },
     isValid: (v) => v >= 0,
-    encoding: { offset: 0, scale: 10, unit: 'mm' }, // 0…6553 mm at 0.1 mm steps
+    encoding: { offset: 0, scale: 10 }, // 0…6553 mm at 0.1 mm steps
   },
 ]
 

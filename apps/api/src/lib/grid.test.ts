@@ -32,7 +32,7 @@ test('encodePng produces a valid PNG that round-trips', () => {
 test('grid → PNG: north-up flip, rg16 packing, invalid cells transparent', () => {
   // 2 wide × 3 tall, CWA order: south row first. -999 = sea.
   const values = parseGrid('1.00E+00,-999.0E+00, 2.55E+01,3.0E+00, -3.4E+00,28.7E+00', 2, 3)
-  const enc: GridEncoding = { encoding: 'rg16', offset: 50, scale: 100, unit: '°C', width: 2, height: 3 }
+  const enc: GridEncoding = { encoding: 'rg16', offset: 50, scale: 100, width: 2, height: 3 }
   const { rgba } = decodePng(gridToPng(values, enc, (v) => v > -90))
   const px = (x: number, y: number) => { const i = (y * 2 + x) * 4; return { v: Math.round((((rgba[i] << 8) | rgba[i + 1]) / enc.scale - enc.offset) * 100) / 100, a: rgba[i + 3] } } // round: float noise
   assert.deepEqual(px(0, 0), { v: -3.4, a: 255 }) // image top row = grid's LAST (northern) row

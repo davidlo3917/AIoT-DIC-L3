@@ -8,7 +8,6 @@
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm --filter web build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
-    "db:push": "pnpm --filter api db:push"
+    "test": "pnpm -r test"
   }
 }

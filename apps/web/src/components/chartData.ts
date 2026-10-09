@@ -1,6 +1,4 @@
-import type { ForecastPeriod, Observation } from '../api'
-
-export const stationSnapshot = (observations: Observation[], stationId: number) => observations.find((o) => o.stationId === stationId) ?? null
+import type { ForecastPeriod } from '../api'
 
 export function chartExtent(points: { v: number }[], bars = false) {
   const min = Math.min(...points.map((p) => p.v)), max = Math.max(...points.map((p) => p.v))

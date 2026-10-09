@@ -5,8 +5,8 @@ import { shortDayTime } from '../../i18n'
 import { cycloneBounds, ring, typhoonFeatures } from './typhoon'
 
 const fix = (lon: number, lat: number, time: string, extra: Partial<Fix> = {}): Fix =>
-  ({ time, lon, lat, wind: null, gust: null, pressure: null, speed: null, direction: null, r15: null, r25: null, r70: null, ...extra })
-const koguma: Cyclone = { name: 'KOGUMA', cwaName: '小熊', number: '28', td: '31',
+  ({ time, lon, lat, wind: null, pressure: null, r15: null, r25: null, r70: null, ...extra })
+const koguma: Cyclone = { name: 'KOGUMA', cwaName: '小熊',
   analysis: [fix(156, 19, '2026-10-09T00:00:00Z'), fix(155.3, 19.3, '2026-10-09T06:00:00Z', { r15: 180, r25: 70 })],
   forecast: [fix(153.9, 19.9, '2026-10-09T12:00:00Z', { r70: 40 }), fix(152, 21, '2026-10-09T18:00:00Z', { r70: 70 })] }
 

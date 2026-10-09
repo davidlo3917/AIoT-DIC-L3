@@ -1,7 +1,7 @@
 import { encodePng } from './png.js'
 
 /** How a float grid is packed into a PNG: value16 = round((v + offset) * scale), R = high byte, G = low byte, A = valid. */
-export type GridEncoding = { encoding: 'rg16'; offset: number; scale: number; unit: string; width: number; height: number }
+export type GridEncoding = { encoding: 'rg16'; offset: number; scale: number; width: number; height: number }
 
 /**
  * CWA grids: scientific notation, first value = south-west corner, west→east then south→north.

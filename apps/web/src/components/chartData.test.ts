@@ -24,7 +24,7 @@ test('weather icons follow the wording, by day and by night', () => {
 })
 
 test('forecast periods group into Taiwan days, overnight with the evening before', () => {
-  const p = (start: string) => ({ start, end: start, weather: null, weatherCode: null, min: null, max: null, rainChance: null })
+  const p = (start: string) => ({ start, end: start, weather: null, min: null, max: null, rainChance: null })
   const days = forecastDays([
     p('2026-10-09T04:00:00Z'), // Fri 12:00 → Friday day
     p('2026-10-09T10:00:00Z'), // Fri 18:00 → Friday night

@@ -21,7 +21,7 @@ const BUDGET_MS = 40_000
 
 /** The frame: a lat/lon crop around Taiwan at ~0.03° (the WRF spacing), north-up, values at cell centres. */
 export const CROP = { west: 115, east: 127, south: 19, north: 29, width: 400, height: 334 }
-export type WindEncoding = { encoding: 'uv8'; width: number; height: number; unit: 'm/s'; run: string; hour: number }
+type WindEncoding = { encoding: 'uv8'; width: number; height: number; run: string }
 
 /** One range of the file. `etag` (from the first read) makes S3 answer 412 instead of bytes from a file CWA has since replaced. */
 async function fetchRange(url: string, from: number, length: number, etag?: string) {
@@ -111,7 +111,7 @@ export function encodeUv8(u: Float32Array, v: Float32Array, width: number, heigh
 }
 
 /** One lead time: read the file's run, and if it is newer than the frame stored for that valid time, decode and store it. */
-export async function ingestHour(hour: number) {
+async function ingestHour(hour: number) {
   const url = `${HOST}M-A0064-${pad(hour, 3)}.grb2` // a fixed host and a number: nothing in the URL comes from outside
   const { bytes, total, etag } = await fetchRange(url, 0, HEAD)
   const first = parseHeader(bytes)
@@ -127,7 +127,7 @@ export async function ingestHour(hour: number) {
   for (const m of [u, v]) if (m.header.data.length > MAX_DATA) throw new Error(`M-A0064-${pad(hour, 3)}: data section is ${m.header.data.length} bytes`)
   const [ub, vb] = await Promise.all([u, v].map((m) => fetchRange(url, m.at + m.header.data.offset, m.header.data.length, etag).then((r) => r.bytes)))
   const png = encodeUv8(resample(unpackSimple(ub, u.header.packing), u.header.grid), resample(unpackSimple(vb, v.header.packing), v.header.grid), CROP.width, CROP.height)
-  const meta: WindEncoding = { encoding: 'uv8', width: CROP.width, height: CROP.height, unit: 'm/s', run: run.toISOString(), hour }
+  const meta: WindEncoding = { encoding: 'uv8', width: CROP.width, height: CROP.height, run: run.toISOString() }
   const storagePath = framePath(LAYER, run, 'png', `/${pad(hour, 3)}`) // the run is in the path: files are cached immutable, so a newer run is a new file
   await upload(storagePath, png) // upload first: a row must never point at a missing file
   // One row per valid time, so /frames needs no notion of runs: a newer run takes the row over and the older file goes.

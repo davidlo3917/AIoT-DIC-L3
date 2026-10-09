@@ -7,7 +7,7 @@ const SOURCE = 'warnings', FILL = 'warning-fill', CASING = 'warning-casing', LIN
 const HIGHLIGHT = '#ff2bd6'
 
 // For the panel's dots: CWA's own colour language where it has one (rain advisories run blue → orange → red → purple with severity).
-export const WARNING_COLORS: [RegExp, string][] = [
+const WARNING_COLORS: [RegExp, string][] = [
   [/超大豪雨/, '#a855f7'], [/大豪雨/, '#ef4444'], [/豪雨/, '#f97316'], [/大雨/, '#3b82f6'], [/颱風/, '#ef4444'],
   [/雷雨/, '#f97316'], [/強風/, '#eab308'], [/低溫/, '#38bdf8'], [/濃霧/, '#9ca3af'],
 ]
