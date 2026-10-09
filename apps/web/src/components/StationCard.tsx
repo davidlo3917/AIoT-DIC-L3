@@ -56,7 +56,9 @@ export default function StationCard({ stations }: { stations: Station[] }) {
 
   if (!station) return null
   const ramp = RAMPS[variable], data = Array.isArray(rows) ? rows : []
-  const current = snapshot?.time === frame?.time ? snapshot : null
+  // The previous readings stay up until the next ones replace them: blanking them on every playback step flickered
+  // the whole card. The time line names the readings shown, so the two always agree.
+  const current = frame ? snapshot : null
   const num = (k: keyof Readings, digits = 1) => { const v = current?.value?.[k]; return v == null ? '—' : v.toFixed(digits) }
   const dir = current?.value?.windDirection, compass = t('compass').split(',')
   const now = Date.now()
@@ -79,7 +81,7 @@ export default function StationCard({ stations }: { stations: Station[] }) {
         </div>
         <button type="button" onClick={() => actions.selectStation(null)} aria-label={t('close')} className="ui-button grid shrink-0 place-items-center">✕</button>
       </header>
-      <p className="ui-muted mb-2 text-sm">{frame ? t('station.asOf', { time: dayTime.format(new Date(frame.time)) }) : t('station.noTime')}</p>
+      <p className="ui-muted mb-2 text-sm">{frame ? t('station.asOf', { time: dayTime.format(new Date(current?.time ?? frame.time)) }) : t('station.noTime')}</p>
       {frame && !current && <p className="ui-muted py-2 text-sm" role="status">{t('station.loading')}</p>}
       {current && !current.value && <p className="py-2 text-sm text-amber-200" role="status">{t(current.error ? 'station.failed' : 'station.none')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>}
       <dl className="mb-2 grid grid-cols-3 gap-x-2 gap-y-1.5 text-sm">
