@@ -20,8 +20,8 @@ export const LAYERS: Record<LayerId, LayerDef> = {
   rain: { frames: 'rain-grid', everyMin: 10, loop: 3, kind: 'grid', stations: 'rain', landOnly: false, legend: RAMPS.rain },
   radar: { frames: 'radar', everyMin: 10, loop: 3, kind: 'image', stations: 'rain', landOnly: false, legend: RADAR_RAMP },
   satellite: { frames: 'satellite', everyMin: 10, loop: 3, kind: 'image', stations: 'temperature', landOnly: false },
-  // A model forecast, 6-hourly, reaching 3.5 days past now: its timeline opens at the present, and Play from the far
-  // end replays the whole forecast from there.
+  // A model forecast, 6-hourly from CWA and hourly on the timeline (blended in between: map/layers/wind.ts), reaching
+  // 3.5 days past now: its timeline opens at the present, and Play from the far end replays the whole forecast from there.
   wind: { frames: 'wind', everyMin: 360, loop: 84, kind: 'wind', stations: 'wind', landOnly: false, legend: RAMPS.wind },
   // CWA publishes no humidity grid, so this one follows the station clock and is interpolated in the browser.
   humidity: { frames: 'stations', everyMin: 10, loop: 3, kind: 'stations-idw', stations: 'humidity', landOnly: true, legend: RAMPS.humidity },

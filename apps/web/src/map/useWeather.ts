@@ -4,9 +4,10 @@ import { getFrames, getObservations, getTyphoons, getWarnings, type Frame, type 
 import { LAYERS } from '../layers'
 import { STATUS, type Status } from '../status'
 import { actions, currentFrame, useStore } from '../timeline/store'
-import { loadField, loadImage, loadWind, paint, type Field, type WindField } from './layers/grid'
+import { corners, loadField, loadImage, loadWind, paint, type Field, type WindField } from './layers/grid'
 import { idw } from './layers/idw'
 import { startParticles } from './layers/particles'
+import { hourly } from './layers/wind'
 import { addStationLayers, updateStations, setStationsVisible } from './layers/stations'
 import { addTyphoonLayers, cycloneBounds, setTyphoonsVisible, updateTyphoons } from './layers/typhoon'
 import { addWarningLayers, countyBounds, updateWarnings, type Counties } from './layers/warnings'
@@ -17,7 +18,6 @@ const COAST = 'surface-coast' // copy of the basemap's water, drawn over land-on
 const OPACITY = { grid: 0.92, 'stations-idw': 0.92, image: 0.85, wind: 0.9 }
 const FRAME_MS = 700 // how long a frame stays up at 1×
 
-const corners = ([w, s, e, n]: Field['bounds']) => [[w, n], [e, n], [e, s], [w, s]] as [[number, number], [number, number], [number, number], [number, number]]
 const scratch = () => Object.assign(document.createElement('canvas'), { width: 2, height: 2 })
 
 /**
@@ -111,9 +111,10 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   }, [map, layerId])
 
   // The particles exist only while the wind layer is up; they follow whatever field the frame effect below has loaded.
+  // They go under the place names (the basemap's first symbol layer), and so under the overlays appended after those.
   useEffect(() => {
     if (!map || layer.kind !== 'wind') return
-    return startParticles(map, () => windField.current)
+    return startParticles(map, () => windField.current, map.getStyle().layers.find((l) => l.type === 'symbol')?.id)
   }, [map, layer.kind])
 
   // Frames for the active layer; re-polled so a tab left open keeps up with new data.
@@ -122,14 +123,14 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     const load = () => {
       const token = actions.beginLoad(layerId)
       getFrames(layer.frames, ac.signal).then(
-        (frames) => { if (!ac.signal.aborted) actions.setFrames(layerId, token, frames) },
+        (frames) => { if (!ac.signal.aborted) actions.setFrames(layerId, token, layer.kind === 'wind' ? hourly(frames) : frames) },
         (e) => { if (e.name !== 'AbortError' && !ac.signal.aborted) actions.failLoad(layerId, token) },
       )
     }
     load()
     const timer = setInterval(load, 5 * 60e3)
     return () => { ac.abort(); clearInterval(timer) }
-  }, [layerId, layer.frames, refreshKey])
+  }, [layerId, layer.frames, layer.kind, refreshKey])
 
   // Draw the current frame.
   useEffect(() => {
@@ -328,7 +329,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   useEffect(() => {
     for (const next of frames.slice(index + 1, index + 3)) {
       if ((layer.kind === 'stations-idw' || showStations) && Date.parse(next.time) <= Date.now()) getObservations(next.time).catch(() => {})
-      if (next.url) (layer.kind === 'image' ? loadImage(next.url, next.bounds!) : layer.kind === 'wind' ? loadWind(next) : loadField(next)).catch(() => {})
+      if (next.url || next.between) (layer.kind === 'image' ? loadImage(next.url!, next.bounds!) : layer.kind === 'wind' ? loadWind(next) : loadField(next)).catch(() => {})
     }
   }, [frames, index, layer.kind, showStations])
 

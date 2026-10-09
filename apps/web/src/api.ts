@@ -4,7 +4,8 @@ export type Readings = { temperature: number | null; humidity: number | null; pr
 export type Observation = Readings & { stationId: number; observedAt: string }
 export type GridMeta = { encoding: 'rg16'; offset: number; scale: number; unit: string; width: number; height: number }
 export type WindMeta = { encoding: 'uv8'; width: number; height: number; unit: string; run: string; hour: number } // mirrors ingestion/wind.ts
-export type Frame = { time: string; url?: string; bounds?: [number, number, number, number]; meta?: GridMeta | WindMeta | null } // encoded grids only; radar and satellite are plain pictures
+export type Frame = { time: string; url?: string; bounds?: [number, number, number, number]; meta?: GridMeta | WindMeta | null // encoded grids only; radar and satellite are plain pictures
+  between?: [Frame, Frame, number] } // browser only: an hourly wind frame blended from the two CWA frames around it, this far from the first
 export type FrameLayer = 'stations' | 'temperature-grid' | 'rain-grid' | 'radar' | 'satellite' | 'wind'
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {

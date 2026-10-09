@@ -1,8 +1,11 @@
 import type { Frame } from '../../api'
 import { colorOf, type Ramp } from '../../ramps'
+import { blend } from './wind'
 
 /** A decoded field: row 0 = north. NaN = no data. `bounds` = [west, south, east, north] of the image edges. */
 export type Field = { width: number; height: number; values: Float32Array; bounds: [number, number, number, number] }
+/** The four corners a MapLibre image/canvas source takes, from field bounds. */
+export const corners = ([w, s, e, n]: Field['bounds']) => [[w, n], [e, n], [e, s], [w, s]] as [[number, number], [number, number], [number, number], [number, number]]
 
 /** A wind field: `values` is the speed (what the surface colours), u and v drive the particles. */
 export type WindField = Field & { u: Float32Array; v: Float32Array }
@@ -21,6 +24,10 @@ export function loadField(frame: Frame): Promise<Field> {
 
 const winds = new Map<string, Promise<WindField>>()
 export function loadWind(frame: Frame): Promise<WindField> {
+  if (frame.between) { // an hourly frame: both CWA frames come from the cache, the blend is a few ms and is not kept
+    const [a, b, t] = frame.between
+    return Promise.all([loadWind(a), loadWind(b)]).then(([fa, fb]) => blend(fa, fb, t))
+  }
   const { url, meta, bounds } = frame
   if (!url || !bounds || meta?.encoding !== 'uv8') return Promise.reject(new Error('frame is not a wind field'))
   return remember(winds, url, 12, async () => {
