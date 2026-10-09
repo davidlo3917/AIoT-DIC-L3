@@ -10,6 +10,16 @@ type State = { layer: LayerId; showStations: boolean; frames: Frame[]; index: nu
   warnings: Warning[]; warningFocus: number | null } // the advisory opened in the panel: its counties are stressed on the map
 export const currentFrame = (s: State): Frame | undefined => s.frames[s.index]
 
+/**
+ * The frame to follow: the last one at or before now (with the half hour of clock tolerance the age label allows too).
+ * That is simply the last frame for a layer that only has the past; the wind forecast's frames run on past now and
+ * are reached by stepping or playing forward, so "即時" never shows the future.
+ */
+export function latestIndex(frames: Frame[], now = Date.now()) {
+  const i = frames.findLastIndex((f) => Date.parse(f.time) <= now + 30 * 60e3)
+  return i >= 0 || !frames.length ? i : 0
+}
+
 /** Independent instances make out-of-order requests and playback testable without a browser. */
 export function createTimelineStore() {
   let state: State = { layer: 'temperature', showStations: true, frames: [], index: -1, playing: false, speed: 1,
@@ -37,7 +47,7 @@ export function createTimelineStore() {
     setFrames(layer: LayerId, token: number, frames: Frame[]) {
       if (layer !== state.layer || token !== request) return
       const time = currentFrame(state)?.time ?? state.cursorTime
-      let index = frames.length - 1
+      let index = latestIndex(frames)
       if (!state.followLatest && time && frames.length) {
         index = frames.findLastIndex((f) => f.time <= time)
         if (index < 0) index = 0
@@ -53,17 +63,21 @@ export function createTimelineStore() {
       const last = state.frames.length - 1
       index = Math.min(last, Math.max(0, index)) // -1 while there are no frames
       // Landing on the newest frame (slider dragged to the end, Next onto it) means "show me now": keep following.
-      set({ playing: false, followLatest: index === last, index, cursorTime: state.frames[index]?.time ?? null })
+      set({ playing: false, followLatest: index === latestIndex(state.frames), index, cursorTime: state.frames[index]?.time ?? null })
     },
     step(by: number) { actions.seek(state.index + by) },
-    latest() { set({ followLatest: true, playing: false, index: state.frames.length - 1, cursorTime: state.frames.at(-1)?.time ?? null }) },
+    latest() {
+      const index = latestIndex(state.frames)
+      set({ followLatest: true, playing: false, index, cursorTime: state.frames[index]?.time ?? null })
+    },
     setSpeed(speed: number) { set({ speed }) },
     toggle() {
       if (state.frames.length < 2) return
       let index = state.index
       if (!state.playing && index >= state.frames.length - 1) {
-        // From the newest frame, Play replays the layer's recent loop rather than the whole week (7 days of 10-minute
-        // frames take 12 minutes). At least one step back, so there is always something to play.
+        // From the last frame, Play replays the layer's recent loop rather than the whole week (7 days of 10-minute
+        // frames take 12 minutes). At least one step back, so there is always something to play. (A forecast layer's
+        // last frame is days ahead; from the present it simply plays forward.)
         const from = Date.parse(state.frames[index].time) - LAYERS[state.layer].loop * 3600e3
         index = Math.min(state.frames.length - 2, state.frames.findIndex((f) => Date.parse(f.time) >= from))
       }

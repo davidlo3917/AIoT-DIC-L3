@@ -11,6 +11,7 @@ export const zh = {
   'layer.rain': '雨量', 'layer.rain.hint': '過去 1 小時累積雨量',
   'layer.radar': '雷達', 'layer.radar.hint': '目前哪裡在下雨',
   'layer.satellite': '衛星', 'layer.satellite.hint': '目前哪裡有雲（紅外線）',
+  'layer.wind': '風', 'layer.wind.hint': '預報地面風，含未來 3 天',
   'layer.humidity': '濕度', 'layer.humidity.hint': '由測站資料推估',
   'legend.label': '{name}色階，{lo} 到 {hi} {unit}。{hint}',
   'stations.toggle': '測站', 'stations.zoomHint': '放大看更多', 'stations.title': '縮小時只顯示主要測站，放大地圖可看到更多',
@@ -21,8 +22,8 @@ export const zh = {
   'timeline.live': '即時', 'timeline.live.title': '有新資料時自動顯示',
   'timeline.latest': '回到最新', 'timeline.latest.title': '跳到最新資料並持續更新',
   'timeline.speed': '速度', 'timeline.speed.label': '播放速度', 'timeline.time': '時間',
-  'every.10': '每 10 分鐘', 'every.60': '每小時',
-  'timeline.past': '過去 {reach} · {every}更新', 'timeline.days': '{days} 天', 'timeline.hours': '{hours} 小時',
+  'every.10': '每 10 分鐘', 'every.60': '每小時', 'every.360': '每 6 小時',
+  'timeline.past': '過去 {reach} · {every}更新', 'timeline.span': '過去 {reach}到未來 {ahead} · {every}更新', 'timeline.days': '{days} 天', 'timeline.hours': '{hours} 小時',
   'timeline.few': '目前只有 {n} 筆資料，還在累積中，{every}新增一筆',
   'timeline.one': '目前只有一筆資料，還無法播放；{every}會有新資料',
   'timeline.loading': '載入時間軸中…', 'timeline.none': '目前還沒有資料', 'timeline.unavailable': '無法取得時間軸',
@@ -45,7 +46,7 @@ export const zh = {
   'station.temp': '氣溫', 'station.humidity': '濕度', 'station.pressure': '氣壓',
   'station.wind': '風', 'station.rain1h': '1 小時雨量', 'station.rain24h': '24 小時雨量',
   compass: '北,東北,東,東南,南,西南,西,西北',
-  'var.temperature': '氣溫', 'var.humidity': '濕度', 'var.rain': '雨量',
+  'var.temperature': '氣溫', 'var.humidity': '濕度', 'var.rain': '雨量', 'var.wind': '風速',
   'station.chart': '{name}，地圖時間前後 24 小時 · 虛線為地圖時間',
   'station.history.loading': '載入歷史資料中…', 'station.history.failed': '無法載入歷史資料。',
   'chart.short': '歷史資料還不夠，每 10 分鐘會有一筆新資料。',
@@ -82,8 +83,12 @@ export const weekday = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei
 export const monthDay = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }) // 10/5
 
 const ago = new Intl.RelativeTimeFormat('zh-TW')
-/** How old a frame is: minutes up to an hour and a half, hours up to two days, days beyond. A viewer's clock running behind must not read as "in 3 minutes". */
+/**
+ * How old a frame is: minutes up to an hour and a half, hours up to two days, days beyond; the same ahead of now for a
+ * forecast frame ("6 小時後"). Up to half an hour ahead still reads as now: a viewer's clock running behind must not say "in 3 minutes".
+ */
 export function age(time: number, now: number) {
-  const min = Math.round((now - time) / 60e3)
-  return min <= 0 ? zh['age.now'] : min < 90 ? ago.format(-min, 'minute') : min < 48 * 60 ? ago.format(-Math.round(min / 60), 'hour') : ago.format(-Math.round(min / 1440), 'day')
+  const min = Math.round((now - time) / 60e3), abs = Math.abs(min), sign = min < 0 ? 1 : -1
+  if (min <= 0 && abs <= 30) return zh['age.now']
+  return abs < 90 ? ago.format(sign * abs, 'minute') : abs < 48 * 60 ? ago.format(sign * Math.round(abs / 60), 'hour') : ago.format(sign * Math.round(abs / 1440), 'day')
 }

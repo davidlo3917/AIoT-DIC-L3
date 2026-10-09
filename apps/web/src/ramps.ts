@@ -2,7 +2,8 @@
 // that is what people who read weather maps already know:
 //  - temperature: the cold-blue → warm-red scale used by Windy / CWA;
 //  - rain: CWA's own stepped QPE scale, which Taiwanese readers recognise from TV forecasts;
-//  - humidity: a single-hue sequential ramp (no convention to honour, so the plain rule applies).
+//  - humidity: a single-hue sequential ramp (no convention to honour, so the plain rule applies);
+//  - wind: Windy's blue → green → yellow → red → purple, which calm → gale readers of wind maps expect.
 export type Ramp = { unit: string; stops: [number, string][]; stepped?: boolean; ticks: number[]; format: (v: number) => string }
 
 export const RAMPS = {
@@ -21,6 +22,11 @@ export const RAMPS = {
     format: (v) => v.toFixed(1),
     stops: [[1, '#9cfcff'], [2, '#03c8ff'], [6, '#059bff'], [10, '#0363ff'], [15, '#059902'], [20, '#39ff03'], [30, '#fffb03'], [40, '#ffc800'],
       [50, '#ff9500'], [70, '#ff0000'], [90, '#cc0000'], [110, '#990000'], [130, '#960099'], [150, '#c900cc'], [200, '#fb00ff'], [300, '#fdc9ff']],
+  },
+  wind: {
+    unit: 'm/s', ticks: [0, 5, 10, 15, 20, 25],
+    format: (v) => v.toFixed(1),
+    stops: [[0, '#4c5aa8'], [3, '#3a6ea5'], [5, '#4a94a9'], [8, '#4d8d49'], [11, '#b0aa34'], [14, '#d0833c'], [17, '#cd533e'], [21, '#9e3e58'], [25, '#703d6e'], [30, '#4c386d']],
   },
 } satisfies Record<string, Ramp>
 

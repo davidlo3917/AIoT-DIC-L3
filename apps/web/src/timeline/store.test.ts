@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Frame } from '../api'
-import { createTimelineStore, currentFrame } from './store'
+import { createTimelineStore, currentFrame, latestIndex } from './store'
 
 const frames = (...hours: number[]): Frame[] => hours.map((h) => ({ time: new Date(Date.UTC(2026, 8, 22, h)).toISOString() }))
 const load = (store: ReturnType<typeof createTimelineStore>, data: Frame[]) => {
@@ -90,6 +90,26 @@ test('Play from the newest frame replays the layer\'s recent loop; from elsewher
   a.setLayer('rain'); load(store, frames(1, 2, 12)); a.latest(); a.toggle() // a gap: only the newest frame is inside the loop
   assert.equal(store.getSnapshot().index, 1, 'still one step back, so Play has something to play')
   assert.equal(store.getSnapshot().playing, true)
+})
+
+test('a forecast layer follows the last frame at or before now, never the future', () => {
+  const now = Date.now(), forecast: Frame[] = [-30, -4, 2, 8, 14].map((h) => ({ time: new Date(now + h * 3600e3).toISOString() }))
+  assert.equal(latestIndex(forecast, now), 1, 'the +2 h frame is nearer, but it is the future')
+  assert.equal(latestIndex(forecast, now + 1.6 * 3600e3), 2, 'half an hour of clock tolerance, as the age label gives')
+  assert.equal(latestIndex([], now), -1)
+  assert.equal(latestIndex(forecast.slice(2), now), 0, 'all in the future: the earliest')
+  const store = createTimelineStore(), a = store.actions
+  a.setLayer('wind'); load(store, forecast)
+  assert.equal(store.getSnapshot().index, 1)
+  a.seek(4)
+  assert.equal(store.getSnapshot().followLatest, false, 'the far end of the forecast is not "now"')
+  a.seek(1)
+  assert.equal(store.getSnapshot().followLatest, true)
+  a.toggle() // from the present, Play goes forward through the forecast…
+  assert.equal(store.getSnapshot().index, 1)
+  a.tick(); a.tick(); a.tick(); a.tick() // …and off the end comes back to the present
+  assert.equal(store.getSnapshot().index, 1)
+  assert.equal(store.getSnapshot().followLatest, true)
 })
 
 test('stations are shown by default and hiding them clears selection', () => {

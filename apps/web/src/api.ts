@@ -3,8 +3,9 @@ export type Station = { id: number; cwaStationId: string; name: string; county: 
 export type Readings = { temperature: number | null; humidity: number | null; pressure: number | null; windSpeed: number | null; windDirection: number | null; gustSpeed: number | null; rain1h: number | null; rain24h: number | null }
 export type Observation = Readings & { stationId: number; observedAt: string }
 export type GridMeta = { encoding: 'rg16'; offset: number; scale: number; unit: string; width: number; height: number }
-export type Frame = { time: string; url?: string; bounds?: [number, number, number, number]; meta?: GridMeta | null } // encoded grids only; radar and satellite are plain pictures
-export type FrameLayer = 'stations' | 'temperature-grid' | 'rain-grid' | 'radar' | 'satellite'
+export type WindMeta = { encoding: 'uv8'; width: number; height: number; unit: string; run: string; hour: number } // mirrors ingestion/wind.ts
+export type Frame = { time: string; url?: string; bounds?: [number, number, number, number]; meta?: GridMeta | WindMeta | null } // encoded grids only; radar and satellite are plain pictures
+export type FrameLayer = 'stations' | 'temperature-grid' | 'rain-grid' | 'radar' | 'satellite' | 'wind'
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`/api${path}`, { signal })
@@ -13,11 +14,14 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 export const PLAYBACK_DAYS = 7 // what the database keeps
-// The start of the playback window, rounded down to the hour so every visitor in that hour asks the CDN the same URL.
-const since = () => new Date(Math.floor((Date.now() - PLAYBACK_DAYS * 86400e3) / 3600e3) * 3600e3).toISOString()
+export const FORECAST_DAYS = 4 // the wind forecast reaches 3.5 days ahead
+// The ends of the playback window, rounded down to the hour so every visitor in that hour asks the CDN the same URL.
+const hour = (days: number) => new Date(Math.floor((Date.now() + days * 86400e3) / 3600e3) * 3600e3).toISOString()
 
 export const getStations = () => get<Station[]>('/stations')
-export const getFrames = (layer: FrameLayer, signal?: AbortSignal) => get<{ frames: Frame[] }>(`/frames?layer=${layer}&from=${since()}`, signal).then((r) => r.frames)
+// Only the wind layer has frames beyond now; for the others the server's default `to` (now) keeps the URL stable for an hour.
+export const getFrames = (layer: FrameLayer, signal?: AbortSignal) =>
+  get<{ frames: Frame[] }>(`/frames?layer=${layer}&from=${hour(-PLAYBACK_DAYS)}${layer === 'wind' ? `&to=${hour(FORECAST_DAYS)}` : ''}`, signal).then((r) => r.frames)
 // One request per instant, shared by the station dots, the humidity surface and the playback preloader. Not abortable:
 // the server runs an abandoned query to the end anyway, so aborting only threw away an answer replay would want.
 const observations = new Map<string, Promise<Observation[]>>()
@@ -48,4 +52,4 @@ export const getTyphoons = (signal?: AbortSignal) => get<{ cyclones: Cyclone[] }
 export type Warning = { phenomena: string; significance: string; start: string; end: string; counties: string[]; text: string | null }
 export const getWarnings = (signal?: AbortSignal) => get<{ warnings: Warning[] }>('/warnings', signal).then((r) => r.warnings)
 /** The station's whole playback window, fetched once per card: the chart then follows the map time without refetching. */
-export const getHistory = (cwaId: string, signal?: AbortSignal) => get<{ observations: (Readings & { observedAt: string })[] }>(`/stations/${cwaId}/history?from=${since()}`, signal).then((r) => r.observations)
+export const getHistory = (cwaId: string, signal?: AbortSignal) => get<{ observations: (Readings & { observedAt: string })[] }>(`/stations/${cwaId}/history?from=${hour(-PLAYBACK_DAYS)}`, signal).then((r) => r.observations)

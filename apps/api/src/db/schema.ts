@@ -40,7 +40,7 @@ export const stationObservations = pgTable('station_observations', {
 /** One picture per instant per layer, kept in Storage; this is its index. Encoded grids carry their decoding recipe in `metadata_json`. */
 export const weatherFrames = pgTable('weather_frames', {
   id: serial('id').primaryKey(),
-  layerType: text('layer_type').notNull(), // radar | satellite | rain-grid | temperature-grid
+  layerType: text('layer_type').notNull(), // radar | satellite | rain-grid | temperature-grid | wind
   validAt: ts('valid_at').notNull(), // the time this frame sits at on the timeline
   storagePath: text('storage_path').notNull().unique(),
   minLat: doublePrecision('min_lat').notNull(),

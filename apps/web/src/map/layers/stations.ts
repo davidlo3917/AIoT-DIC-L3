@@ -3,7 +3,7 @@ import type { Observation, Station } from '../../api'
 import { mapExpression, RAMPS, type Variable } from '../../ramps'
 
 const SOURCE = 'stations', DOTS = 'station-dots', LABELS = 'station-values'
-const FIELD: Record<Variable, keyof Observation> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h' }
+const FIELD: Record<Variable, keyof Observation> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h', wind: 'windSpeed' }
 // Zoomed out, only the most relevant stations are drawn, at least SPACING px apart; each zoom level in adds the next
 // most relevant ones that fit, and from ALL_ZOOM on every station is drawn.
 const FIRST_ZOOM = 5, ALL_ZOOM = 11, SPACING = 44

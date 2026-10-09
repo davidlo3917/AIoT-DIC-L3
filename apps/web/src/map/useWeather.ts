@@ -4,8 +4,9 @@ import { getFrames, getObservations, getTyphoons, getWarnings, type Frame, type 
 import { LAYERS } from '../layers'
 import { STATUS, type Status } from '../status'
 import { actions, currentFrame, useStore } from '../timeline/store'
-import { loadField, loadImage, paint, type Field } from './layers/grid'
+import { loadField, loadImage, loadWind, paint, type Field, type WindField } from './layers/grid'
 import { idw } from './layers/idw'
+import { startParticles } from './layers/particles'
 import { addStationLayers, updateStations, setStationsVisible } from './layers/stations'
 import { addTyphoonLayers, cycloneBounds, setTyphoonsVisible, updateTyphoons } from './layers/typhoon'
 import { addWarningLayers, countyBounds, updateWarnings, type Counties } from './layers/warnings'
@@ -13,7 +14,7 @@ import { HOME, REFERENCE_LAYER } from './basemap'
 
 const SURFACE = 'surface'
 const COAST = 'surface-coast' // copy of the basemap's water, drawn over land-only layers so the real coastline clips them
-const OPACITY = { grid: 0.92, 'stations-idw': 0.92, image: 0.85 }
+const OPACITY = { grid: 0.92, 'stations-idw': 0.92, image: 0.85, wind: 0.9 }
 const FRAME_MS = 700 // how long a frame stays up at 1×
 
 const corners = ([w, s, e, n]: Field['bounds']) => [[w, n], [e, n], [e, s], [w, s]] as [[number, number], [number, number], [number, number], [number, number]]
@@ -65,6 +66,8 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   const getLandMask = () => landMask.current ??= getFrames('temperature-grid')
     .then((frames) => frames.length ? loadField(frames[frames.length - 1]) : null)
     .then((mask) => { if (!mask) landMask.current = null; return mask }, (e) => { landMask.current = null; throw e })
+  // The wind field on the map, read by the particle loop every animation frame; null draws no particles.
+  const windField = useRef<WindField | null>(null)
 
   useEffect(() => {
     if (!map) return
@@ -100,11 +103,18 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     map.setLayoutProperty(COAST, 'visibility', 'none')
     surface.bounds = ''
     surface.canvas.getContext('2d')!.clearRect(0, 0, surface.canvas.width, surface.canvas.height)
+    windField.current = null
     setStationsVisible(map, false)
     setShown(null)
     setStatus(null)
     setStationStatus(null)
   }, [map, layerId])
+
+  // The particles exist only while the wind layer is up; they follow whatever field the frame effect below has loaded.
+  useEffect(() => {
+    if (!map || layer.kind !== 'wind') return
+    return startParticles(map, () => windField.current)
+  }, [map, layer.kind])
 
   // Frames for the active layer; re-polled so a tab left open keeps up with new data.
   useEffect(() => {
@@ -127,6 +137,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     if (!frame) {
       map.setPaintProperty(SURFACE, 'raster-opacity', 0)
       surface.bounds = ''
+      windField.current = null
       setStationsVisible(map, false)
       setShown(null)
       setStatus(null)
@@ -198,6 +209,12 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
           const field = idw(points, mask)
           paint(field, layer.legend, s.to, true)
           await show(s.to, field.bounds)
+        } else if (layer.kind === 'wind') {
+          const field = await loadWind(frame)
+          if (!alive) return
+          windField.current = field // the particles pick it up on their next animation frame
+          paint(field, layer.legend, s.to) // the surface is the speed; the particles are the direction
+          await show(s.to, field.bounds)
         } else {
           const field = await loadField(frame)
           if (!alive) return
@@ -209,6 +226,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
         if (!alive) return
         map.setPaintProperty(SURFACE, 'raster-opacity', 0)
         s.bounds = '' // the next good frame cuts in instead of blending from a picture nobody saw
+        windField.current = null
         setStatus(STATUS.noData)
       } finally { clearTimeout(loading); if (alive) setShown(frame) } // a hole in the data must not stall playback either
     })()
@@ -234,7 +252,8 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     if (!map) return
     setStationStatus(null)
     // The previous frame's stations stay up until this one's replace them: hiding them in between blinks every label.
-    if (!frame || !showStations) return setStationsVisible(map, false)
+    // A forecast frame (wind) lies ahead of now: there are no readings for it, and that is not a problem to report.
+    if (!frame || !showStations || Date.parse(frame.time) > Date.now()) return setStationsVisible(map, false)
     let alive = true
     getObservations(frame.time).then((obs) => {
       if (!alive) return
@@ -308,8 +327,8 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   const frames = useStore((s) => s.frames), index = useStore((s) => s.index)
   useEffect(() => {
     for (const next of frames.slice(index + 1, index + 3)) {
-      if (layer.kind === 'stations-idw' || showStations) getObservations(next.time).catch(() => {})
-      if (next.url) (layer.kind === 'image' ? loadImage(next.url, next.bounds!) : loadField(next)).catch(() => {})
+      if ((layer.kind === 'stations-idw' || showStations) && Date.parse(next.time) <= Date.now()) getObservations(next.time).catch(() => {})
+      if (next.url) (layer.kind === 'image' ? loadImage(next.url, next.bounds!) : layer.kind === 'wind' ? loadWind(next) : loadField(next)).catch(() => {})
     }
   }, [frames, index, layer.kind, showStations])
 

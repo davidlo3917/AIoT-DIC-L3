@@ -33,6 +33,7 @@ test('range rejects inverted, oversized, and non-ISO input', () => {
 test('at defaults to now; layer is a closed set', () => {
   assert.ok(Math.abs(atQuery.parse({}).at.getTime() - Date.now()) < 5000)
   assert.equal(layerQuery.safeParse({ layer: 'radar' }).success, true)
+  assert.equal(layerQuery.safeParse({ layer: 'wind' }).success, true)
   assert.equal(layerQuery.safeParse({ layer: 'radar; drop table' }).success, false)
   assert.equal(layerQuery.safeParse({}).success, false)
 })

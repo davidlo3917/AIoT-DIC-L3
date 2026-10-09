@@ -6,6 +6,7 @@
   "buildCommand": "pnpm typecheck && pnpm test && pnpm build",
   "outputDirectory": "apps/web/dist",
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api" }],
+  "functions": { "api/index.ts": { "maxDuration": 60 } },
   "headers": [
     {
       "source": "/(.*)",

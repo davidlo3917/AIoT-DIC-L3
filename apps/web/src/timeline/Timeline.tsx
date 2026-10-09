@@ -47,14 +47,16 @@ export default function Timeline({ status }: { status: Status }) {
     return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onPointer, true) }
   }, [])
 
-  // Playback itself is driven from useWeather, which knows when a frame is actually on the map.
-  const last = frames.length - 1, following = followLatest && index === last
+  // Playback itself is driven from useWeather, which knows when a frame is actually on the map. The store keeps
+  // `followLatest` and the index consistent itself (seek, latest, the re-poll), so the flag alone says it.
+  const last = frames.length - 1, following = followLatest
   // How far back the slider reaches, counted from now: in days once it spans more than a day and a half (rounded, as
   // the window starts on the hour), in hours before that, while a layer's history is still building up.
   const span = frames[0] ? now - Date.parse(frames[0].time) : 0
   const reach = span > 36 * 3600e3 ? t('timeline.days', { days: Math.min(PLAYBACK_DAYS, Math.round(span / 86400e3)) }) : t('timeline.hours', { hours: Math.ceil(span / 3600e3) })
+  const ahead = frames[last] ? Date.parse(frames[last].time) - now : 0 // a forecast layer's frames run on past now
   // A young layer has little to play; say so, or a Play button that is disabled (or done in one step) looks broken.
-  const history = frames.length > 5 ? t('timeline.past', { reach, every })
+  const history = frames.length > 5 ? ahead > 3600e3 ? t('timeline.span', { reach, ahead: t('timeline.days', { days: Math.max(1, Math.round(ahead / 86400e3)) }), every }) : t('timeline.past', { reach, every })
     : frames.length > 1 ? t('timeline.few', { n: frames.length, every })
     : frames.length === 1 ? t('timeline.one', { every })
     : t(loadState === 'loading' ? 'timeline.loading' : loadState === 'empty' ? 'timeline.none' : 'timeline.unavailable')

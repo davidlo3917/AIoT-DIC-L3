@@ -3,7 +3,7 @@ import { COUNTY_FORECASTS } from '../cwa/forecast.js'
 
 const instant = z.iso.datetime({ offset: true }).transform((s) => new Date(s))
 
-export const MAX_RANGE_DAYS = 8 // a little over the 7-day retention window
+export const MAX_RANGE_DAYS = 12 // the 7-day retention window plus the wind forecast, which reaches 3.5 days ahead
 
 /** `?from=&to=` — ISO-8601 with offset. Defaults to the last 24 h ending now. */
 export const rangeQuery = z.object({ from: instant.optional(), to: instant.optional() }).transform((q, ctx) => {
@@ -17,7 +17,7 @@ export const rangeQuery = z.object({ from: instant.optional(), to: instant.optio
 /** `?at=` — defaults to now. */
 export const atQuery = z.object({ at: instant.optional() }).transform((q) => ({ at: q.at ?? new Date() }))
 
-export const LAYERS = ['stations', 'radar', 'satellite', 'rain-grid', 'temperature-grid'] as const
+export const LAYERS = ['stations', 'radar', 'satellite', 'rain-grid', 'temperature-grid', 'wind'] as const
 export const layerQuery = z.object({ layer: z.enum(LAYERS) })
 
 // CWA station ids are short alphanumerics ("466940", "C0TB40"); reject anything else before it reaches SQL or logs.

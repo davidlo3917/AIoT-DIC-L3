@@ -14,7 +14,7 @@ test('times are Taiwan time, and midnight is 00:00', () => {
   for (const f of [time, dayTime, fullTime]) assert.match(f.format(midnight), /00:00$/, f.format(midnight))
 })
 
-test('data age is minutes, then hours, and never in the future', () => {
+test('data age is minutes, then hours; a forecast frame is "later", a clock slightly behind is not', () => {
   const now = Date.parse('2026-10-05T06:00:00Z')
   assert.equal(age(now - 12 * 60e3, now), '12 分鐘前')
   assert.equal(age(now - 89 * 60e3, now), '89 分鐘前')
@@ -23,4 +23,6 @@ test('data age is minutes, then hours, and never in the future', () => {
   assert.equal(age(now - 71 * 3600e3, now), '3 天前')
   assert.equal(age(now, now), '剛剛')
   assert.equal(age(now + 5 * 60e3, now), '剛剛') // the viewer's clock is behind
+  assert.equal(age(now + 6 * 3600e3, now), '6 小時後')
+  assert.equal(age(now + 78 * 3600e3, now), '3 天後')
 })

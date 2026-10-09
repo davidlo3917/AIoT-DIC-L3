@@ -8,7 +8,7 @@ import Sparkline from './Sparkline'
 import { forecastDays, stationSnapshot, weatherIcon, type ForecastDay } from './chartData'
 
 type Row = Readings & { observedAt: string }
-const FIELD: Record<Variable, keyof Readings> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h' }
+const FIELD: Record<Variable, keyof Readings> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h', wind: 'windSpeed' }
 const MOUNTAIN_M = 1000 // above this a station reads well below its township's forecast (玉山 sits in 信義鄉)
 const DAY = 86400e3
 

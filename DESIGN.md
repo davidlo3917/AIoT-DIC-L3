@@ -12,16 +12,17 @@ A Windy-style weather map of **Taiwan and the surrounding sea**, built on the **
 
 What a visitor gets:
 
-- A full-screen interactive map (MapLibre GL) with one weather layer at a time: temperature, rain, radar, satellite, humidity
+- A full-screen interactive map (MapLibre GL) with one weather layer at a time: temperature, rain, radar, satellite, wind, humidity
 - 1,367 weather and rain-gauge stations drawn as value-labelled dots, thinned by zoom level
 - A station card with the current readings, the township's 7-day forecast and a 24-hour chart
-- A shared timeline that plays back the last **7 days** of every layer at 10-minute (or hourly) steps
+- A shared timeline that plays back the last **7 days** of every layer at 10-minute (or hourly) steps; the wind layer is a model forecast and runs on **3.5 days ahead** as well
 - Traditional Chinese (Taiwan) interface only; all times in Taiwan time (UTC+8)
 - Works on phones, including landscape
 
 What the system does behind that:
 
 - Fetches CWA data every 10 minutes on a schedule, normalises it and keeps 7 days of history (CWA itself only serves the latest snapshot of most products)
+- Reads the 10 m wind out of CWA's WRF model GRIB2 files by HTTP range request, with a 120-line GRIB2 reader of its own
 - Stores station readings in Postgres and gridded/raster products as PNG frames in object storage
 - Serves everything through a small read-only HTTP API behind a CDN
 - Deploys automatically from `main`
@@ -39,8 +40,10 @@ The application is a map, not a dashboard. Everything else floats over it and gi
 │ │ 溫度   │                                   │ 臺中        ✕ │ │
 │ │ 雨量   │          weather surface          │ readings      │ │
 │ │ 雷達   │          + station dots           │ 7-day forecast│ │
-│ │ 濕度   │                                   │ 24 h chart    │ │
-│ │ ☑ 測站 │                                   └───────────────┘ │
+│ │ 衛星   │                                   │ 24 h chart    │ │
+│ │ 風     │                                   └───────────────┘ │
+│ │ 濕度   │                                                     │
+│ │ ☑ 測站 │                                                     │
 │ └────────┘                                                     │
 │ ┌────────┐                                                     │
 │ │ legend │                                                     │
@@ -63,8 +66,8 @@ Layout rules (implemented in `App.tsx` with Tailwind variants):
 Interaction:
 
 - One layer at a time; the legend names it and says in one sentence what it shows ("雷達：目前哪裡在下雨").
-- The timeline **follows the newest data** until the visitor scrubs; "即時" lights up while following, "回到最新" brings it back. Dragging to the right end also resumes following.
-- **Play** from the newest frame replays the recent loop (3 h; the whole day for the hourly temperature layer) rather than the whole week. From anywhere else it plays forward.
+- The timeline **follows the newest data** until the visitor scrubs; "即時" lights up while following, "回到最新" brings it back. Dragging to the right end also resumes following. "Newest" means the last frame at or before now: for the wind forecast that is not the last frame, since the slider runs on 3.5 days past it into the forecast ("6 小時後"), and "即時" never shows the future.
+- **Play** from the newest frame replays the recent loop (3 h; the whole day for the hourly temperature layer) rather than the whole week. From anywhere else it plays forward; on the wind layer that means through the forecast, and the end of it returns to the present.
 - Keyboard: Space play/pause, ← → step. When the map itself has keyboard focus (reached by Tab) the arrows pan the map instead.
 - Clicking a station opens its card; the card's readings follow the timeline, and its chart shows the 24 h around the map time.
 - Status messages (loading, no data for this time, request failed) appear as one line inside the timeline panel, with a Retry button when retrying can help.
@@ -79,6 +82,7 @@ Interaction:
 | 雨量 Rain | Radar-estimated rainfall of the past hour | `O-B0045-001` (0.0125°, 921 × 881) | 10 min | same as temperature |
 | 雷達 Radar | Composite reflectivity picture (dBZ) | `O-A0058-005` (PNG, 3600²) | 10 min | copied to Storage as-is, resampled in the browser |
 | 衛星 Satellite | Himawari infrared colour cloud picture, coastlines drawn in | `O-C0042-002` (JPG, 800²) | 10 min | same as radar; no legend, the picture has no scale to read |
+| 風 Wind | 10 m wind of CWA's WRF 3 km forecast, 0 to +84 h: speed as colour, direction as moving particles | `M-A0064` (GRIB2, 1158 × 673 Lambert grid, ~180 MB per lead time) | 6 h, four runs a day | the two wind fields are range-read and decoded in the API → uv8 PNG frame → coloured and animated in the browser |
 | 濕度 Humidity | Relative humidity | station observations (no CWA grid exists) | 10 min | interpolated in the browser (§13) |
 
 Station data:
@@ -94,7 +98,7 @@ The three station datasets overlap (2,581 records, 1,365–1,367 unique stations
 
 Two overlays are drawn over whichever layer is up, both proxied live like the forecast (§7, §13): typhoons (`W-C0034-005`, every active tropical cyclone with CWA's past fixes, wind radii and forecast positions) and county advisories (`W-C0033-001` per county, `W-C0033-002` for the text: 大雨, 豪雨, 陸上強風, 低溫, 濃霧…). The county outlines for the advisories are a static file, `apps/web/public/counties.json`: the 22 counties from taiwan-atlas (MIT, Ministry of the Interior boundaries), arcs simplified to 0.001° and named as CWA names them (臺, not 台), 154 KB.
 
-Not built: wind, lightning (§20).
+Not built: lightning (§20).
 
 ---
 
@@ -104,6 +108,7 @@ Not built: wind, lightning (§20).
                  ┌─────────────────────┐
                  │   CWA Open Data     │  REST datastore (stations, forecast)
                  │                     │  file API → public S3 (grids, radar and satellite pictures)
+                 │                     │  public S3, range requests (WRF wind GRIB2)
                  └──────────┬──────────┘
                             │ fetch, server-side only (API key)
    Supabase Cron            ▼
@@ -149,7 +154,7 @@ Three principles hold the shape together:
 | Tooling | pnpm workspaces, Task (`Taskfile.yml`), Node 22, `node:test` | pnpm 10 |
 | Hosting | Vercel (one project: static site + API), GitHub Actions for CI | |
 
-Deliberately absent: Turborepo, a `packages/` layer, Python/GRIB tooling, a client-side state library (a 70-line `useSyncExternalStore` store is enough), and `supabase-js`.
+Deliberately absent: Turborepo, a `packages/` layer, Python/ecCodes GRIB tooling (a 120-line reader in `lib/grib.ts` covers the one product used, §9), a client-side state library (a 70-line `useSyncExternalStore` store is enough), and `supabase-js`.
 
 ---
 
@@ -163,22 +168,22 @@ Deliberately absent: Turborepo, a `packages/` layer, Python/GRIB tooling, a clie
 │   │   ├── public/counties.json the 22 county outlines for the advisories (taiwan-atlas, MIT)
 │   │   └── src/
 │   │       ├── api.ts           typed fetchers for /api, 7-day window, observation cache
-│   │       ├── layers.ts        the five layers: frames source, cadence, loop, kind, legend
+│   │       ├── layers.ts        the six layers: frames source, cadence, loop, kind, legend
 │   │       ├── ramps.ts         colour ramps and MapLibre colour expressions
 │   │       ├── i18n.ts          every string, Taiwan-time formatters
 │   │       ├── status.ts        the status line's messages and actions
 │   │       ├── components/      LayerPanel, Legend, Warnings, Typhoons, StationCard, Sparkline, chartData
 │   │       ├── map/             MapView, basemap filter, useWeather (surface + stations + overlays + playback)
-│   │       │   └── layers/      grid decode/paint, IDW, station dots + zoom thinning
+│   │       │   └── layers/      grid decode/paint, wind particles, IDW, station dots + zoom thinning, typhoon and advisory overlays
 │   │       └── timeline/        Timeline UI, store, keyboard shortcuts
 │   └── api/                     Hono API
 │       ├── src/
 │       │   ├── app.ts           routes + error handling
 │       │   ├── routes/          public routes, query schemas
 │       │   ├── cwa/             CWA client, station normaliser, forecast normaliser
-│       │   ├── ingestion/       stations (+ backfill), grids + pictures (radar, satellite), frame prune
+│       │   ├── ingestion/       stations (+ backfill), grids + pictures (radar, satellite), wind (GRIB2 by range request), frame prune
 │       │   ├── db/              Drizzle schema, client
-│       │   ├── lib/             grid parsing, PNG encoder, Storage calls
+│       │   ├── lib/             grid parsing, GRIB2 reader, PNG encoder, Storage calls
 │       │   └── middleware/      bearer auth for /internal
 │       ├── scripts/             db-push, cron-secrets, cron-status, backfill, prune-check
 │       └── drizzle.config.ts
@@ -189,7 +194,7 @@ Deliberately absent: Turborepo, a `packages/` layer, Python/GRIB tooling, a clie
 └── vercel.json                  build, rewrites, security headers
 ```
 
-Tests (`*.test.ts`) sit next to the code they test and run with Node's built-in runner: station/forecast normalisation, grid parsing, query validation, the timeline store, request ordering, IDW, time formatting.
+Tests (`*.test.ts`) sit next to the code they test and run with Node's built-in runner: station/forecast normalisation, grid parsing, the GRIB2 reader (against the first 4 KB of a real WRF message, kept as a fixture), the wind resampling and encoding, query validation, the timeline store, request ordering, IDW, time formatting.
 
 ---
 
@@ -206,9 +211,9 @@ All public routes are read-only `GET`s under `/api`, JSON, and every response ca
 | `GET /api/forecast?county=&town=` | a township's 12-hourly periods for the coming week; proxied live from CWA, nothing stored; only townships that have a station are accepted | 30 min |
 | `GET /api/warnings` | the county advisories in force: phenomenon, period, the counties under it and CWA's text; proxied live, nothing stored | 5 min |
 | `GET /api/typhoons` | every active tropical cyclone: past fixes, the current one with 15/25 m/s wind radii, forecast fixes with the 70 % probability radius; proxied live from CWA, nothing stored | 10 min |
-| `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `satellite`, `rain-grid` or `temperature-grid` | 60 s |
+| `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `satellite`, `rain-grid`, `temperature-grid` or `wind`; a range of up to 12 days | 60 s |
 
-The **frames contract** is the one shape every layer answers in. Station frames are a synthetic 10-minute grid clipped to what is stored (no URL: the browser asks `/observations` per frame). Grid and picture frames carry the Storage URL and the WGS84 bounds; encoded grids also carry their decoding recipe in `meta`.
+The **frames contract** is the one shape every layer answers in. Station frames are a synthetic 10-minute grid clipped to what is stored (no URL: the browser asks `/observations` per frame). Grid and picture frames carry the Storage URL and the WGS84 bounds; encoded grids also carry their decoding recipe in `meta`. Wind frames are the same shape with times that run past now (the browser asks for `to` = now + 4 days for that layer only) and a `meta` that also names the model run and lead time.
 
 Internal routes are `POST`, require `Authorization: Bearer $INGESTION_SECRET`, and are called by Supabase Cron:
 
@@ -216,6 +221,7 @@ Internal routes are `POST`, require `Authorization: Bearer $INGESTION_SECRET`, a
 |---|---|
 | `/api/internal/ingest/stations` | fetch the three station datasets, upsert stations, insert observations |
 | `/api/internal/ingest/grids[?layer=]` | temperature grid, rain grid, radar and satellite pictures → Storage + `weather_frames`; `layer=` runs one |
+| `/api/internal/ingest/wind` | the 15 WRF lead times: each file's header is read, and a file from a newer run than the stored frame is decoded and stored; stops after 40 s and reports `done: false`, the next call continues |
 | `/api/internal/backfill/stations?before=&limit=` | fill hourly station readings from CWA's 24-hour history API |
 | `/api/internal/prune/frames` | delete frames older than 7 days (≤ 1,000 per call) |
 
@@ -239,7 +245,7 @@ station_observations                       PK (station_id, observed_at); index (
   (no surrogate id, no created_at: ~190k rows/day on a 500 MB plan, ~240 B per row with indexes)
 
 weather_frames                             index (layer_type, valid_at desc); storage_path unique
-  id serial PK · layer_type text (radar | satellite | rain-grid | temperature-grid) · valid_at timestamptz
+  id serial PK · layer_type text (radar | satellite | rain-grid | temperature-grid | wind) · valid_at timestamptz
   storage_path text · min_lat, max_lat, min_lon, max_lon double · metadata_json jsonb · created_at
 ```
 
@@ -247,9 +253,9 @@ Also in the database, outside the schema Drizzle manages (hand-written migration
 
 - `private.trigger_ingest(path)` — `security definer`, empty `search_path`, reads `api_base_url` and `ingestion_secret` from Vault and `net.http_post`s to the API. Execute revoked from `public`.
 - `private.prune(fine, hourly)` — the nightly retention job (§11); writes one row per night to `private.db_size_log` (database size, row counts, rows thinned/expired).
-- `cron.job` rows for the five schedules (§10).
+- `cron.job` rows for the six schedules (§10).
 
-Upserts are idempotent: observations conflict on `(station_id, observed_at)` and a later run never blanks a reading an earlier one stored (`coalesce(excluded.col, existing.col)`); frames conflict on `storage_path`. Every ingestion call can be repeated safely.
+Upserts are idempotent: observations conflict on `(station_id, observed_at)` and a later run never blanks a reading an earlier one stored (`coalesce(excluded.col, existing.col)`); frames conflict on `storage_path`. Every ingestion call can be repeated safely. Wind keeps **one row per valid time** whatever the model run: a newer run updates the row to its new file in place (so `/frames` never sees two frames at one time) and then deletes the older file.
 
 ---
 
@@ -262,9 +268,14 @@ temperature-grid/2026/10/09/0600Z.png     ~6 KB
 rain-grid/2026/10/09/0600Z.png            ~4 KB
 radar/2026/10/09/0600Z.png                CWA's own PNG, ~100 KB
 satellite/2026/10/09/0600Z.jpg            CWA's own JPG, ~90 KB
+wind/2026/10/09/0000Z/006.png             run 00Z, lead time +6 h: ~130 KB (the run is in the path, so a newer run is a new file)
 ```
 
 **rg16 encoding.** A float grid becomes a PNG whose pixels carry the value, not a colour: `value16 = round((v + offset) × scale)`, red = high byte, green = low byte, alpha = 255 where valid and 0 for "no data" (sea, outside coverage). Temperature uses offset 50 / scale 100 (0.01 °C steps), rain offset 0 / scale 10 (0.1 mm steps). The recipe is stored in `metadata_json` and returned as `meta`, so the browser decodes any frame without knowing the layer. Colouring happens in the browser, which means a ramp can change without re-ingesting anything.
+
+**uv8 encoding (wind).** A 400 × 334 lat/lon crop of the WRF field, 115–127°E / 19–29°N at 0.03° (the model's own 3 km spacing), values at cell centres, north-up: red = (u + 64) × 2, green = (v + 64) × 2 (0.5 m/s steps, ±64 m/s), blue = speed × 4 (0.25 m/s steps to 63.75), alpha 255 (0 outside the model domain, which the crop never leaves). `meta` carries `{ encoding: 'uv8', width, height, unit, run, hour }`. The browser reads u and v for the particles and the speed for the colour. Half a metre per second is below what a map shows and a quarter of the station readings' resolution.
+
+**Reading the GRIB2.** CWA's WRF file is 78 messages of one Lambert conformal grid (template 3.30: 1158 × 673, LoV 120°E, standard parallels 10° and 40°, 3 km), all in 24-bit simple packing (template 5.0) without a bitmap, and the 10 m U and V are two of them. The file is never downloaded: the first 256 bytes of each message are read by HTTP `Range` until both wind messages are found (they are the 67th and 68th, but one accumulated-rain message and a few 8-bit ones shift their offsets between files; the previous file's offsets are tried first and usually hit), then their two 2.3 MB data sections. Every read after the first carries `If-Match` with the file's ETag, so a file CWA replaces mid-way answers 412 and the lead time waits for the next call instead of mixing two runs. `lib/grib.ts` parses sections 0–6, unpacks any bit width, and projects latitude/longitude onto the grid with Snyder's secant-cone formulas; the sampling of the crop is bilinear. Every length is bounded (message ≤ 64 MB, data ≤ 4 MB, ≤ 4 M points, sections within the bytes read) and anything but this one shape throws. One finding: GRIB says "shape 6" (a 6,371,229 m sphere), but WRF runs on 6,370,000 m, and only with that radius does CWA's documented far corner land on the last grid point — the difference is 0.2 cells, or 600 m, at the far corner.
 
 **Why PNG, not a raw binary:** the browser decodes it with `createImageBitmap` (fast, native, off the main thread), it compresses the large flat areas well, and Storage/CDN treat it as an ordinary image. PNG is encoded in the API with a 26-line zlib-based encoder (`lib/png.ts`) — no image library.
 
@@ -281,6 +292,7 @@ Supabase Cron calls the API; the API does the work next to the database. All tim
 | `ingest-stations` | every 10 min at :05, :15 … | `/api/internal/ingest/stations` |
 | `ingest-grids` | every 10 min at :08, :18 … | `/api/internal/ingest/grids` (temperature, rain, radar, satellite) |
 | `ingest-radar` | every 10 min at :03, :13 … | `/api/internal/ingest/grids?layer=radar` |
+| `ingest-wind` | every 30 min at :00, :30 | `/api/internal/ingest/wind` |
 | `prune` | daily 03:30 | `private.prune(7 days, 7 days)` in SQL |
 | `prune-frames` | daily 03:40 | `/api/internal/prune/frames` |
 
@@ -289,6 +301,7 @@ Design points:
 - **Each product is independent.** `ingestGrids` runs the four products with `Promise.allSettled`; `ingestStations` fetches its three datasets the same way. One CWA hiccup costs one product for one cycle, never the whole cycle — and 10-minute readings CWA never serves again.
 - **Radar is fetched twice per cycle** because CWA only ever serves the latest picture and publishes it 8–10 minutes after frame time; a single :08 fetch missed 23 of 143 frames a day, the extra :03 fetch brought that to ~2.
 - **The radar and satellite pictures' URLs come from CWA documents**, so they are treated as untrusted: only `https://cwaopendata.s3.ap-northeast-1.amazonaws.com/` is fetched, redirects are refused, the file is capped at 5 MB and must start with the PNG or JPEG signature the product promises.
+- **Wind runs on a budget, not a schedule of its own.** CWA runs WRF four times a day and uploads the 15 files over about 1.5 h, from ~5 h after the run (the 00Z files appeared 04:58–06:20 UTC on 2026-10-09). Every 30 min the API reads each file's first message (its run time), skips the lead times whose stored frame is from that run or newer, and decodes the rest in order until 40 s are spent; a call that runs out answers `done: false` and the next one carries on, so a new run is complete within the hour after its last file. A full lead time takes about a second in Tokyo (the header walk is ~67 small reads on the same S3 region; from Taiwan it took 7 s); the function's limit is 60 s (`vercel.json`). The lead times are independent like the other products: one unreadable file is logged and skipped.
 - **Upload before insert.** A `weather_frames` row must never point at a missing file; an orphan file is invisible, an orphan row would be a broken frame.
 - **Backfill** exists only for automatic stations (`O-A0001-001` keeps 24 hourly XML snapshots). It is driven in batches of a few files per call so one call fits a function invocation.
 - Every CWA call has a timeout (10–45 s) and every response is validated with zod before anything is written; one malformed station record is skipped and counted, not fatal.
@@ -299,7 +312,7 @@ Design points:
 
 The free tier allows 500 MB of database and 1 GB of Storage. Measured: ~193k observation rows a day at ~240 B (with indexes) ⇒ about 46 MB/day; frames ~456/day, of which radar (~100 KB) and satellite (~90 KB) are nearly all the bytes.
 
-Policy, since 2026-10-09: **every station reading and every frame is kept for 7 days**, which is exactly what the timeline plays back. Steady state ≈ 325 MB of database (plus a 12 MB empty baseline) and ≈ 200 MB of Storage.
+Policy, since 2026-10-09: **every station reading and every frame is kept for 7 days**, which is exactly what the timeline plays back. Steady state ≈ 325 MB of database (plus a 12 MB empty baseline) and ≈ 200 MB of Storage. Wind adds one ~130 KB frame per 6 h plus the 3.5-day forecast, about 42 files and 6 MB in all; superseded runs are deleted as they are replaced, not by the prune.
 
 - `private.prune(fine, hourly)` deletes observations older than the windows in one statement (the previous policy thinned 3–60-day-old rows to hourly; with both windows at 7 days that step is a no-op by design, and the function still supports it).
 - `pruneFrames` deletes files first, then rows, at most 1,000 per night (about three days' worth, so a backlog clears in a few nights).
@@ -315,12 +328,14 @@ Changing the windows is a migration that re-runs the `cron.schedule` line, never
 One store (`timeline/store.ts`) owns the timeline for every layer: the active layer, its frames, the cursor, play state, speed, follow-latest, and which station is selected. Components read it with `useSyncExternalStore`; the map hook writes frames into it.
 
 ```text
-layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 7 d, rounded down to the hour>
+layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 7 d, rounded down to the hour>[&to=<now + 4 d> for wind]
                                     │
                         setFrames(layer, token, frames)   ← ignored if the layer or token moved on
                                     │
-              follow-latest ? index = last : index = last frame ≤ previous cursor time
+              follow-latest ? index = last frame ≤ now : index = last frame ≤ previous cursor time
 ```
+
+`latestIndex` is the last frame at or before now (plus the half hour of clock tolerance the age label allows): simply the last frame for every layer that only has the past; for the wind forecast the slider continues 3.5 days past it. Following it means that, as time passes, the re-poll moves the viewer to the next forecast frame the way it moves them to a new radar picture.
 
 - `from` is rounded down to the hour so every visitor in that hour asks the CDN the same URL.
 - Frames are re-polled every 5 minutes so an open tab keeps up. A failed re-poll shows "無法更新時間軸" with Retry but keeps the frames on screen and does not stop playback.
@@ -342,6 +357,8 @@ layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 
 **Grids.** The rg16 PNG is decoded with `createImageBitmap` (`premultiplyAlpha: 'none'`, no colour conversion — the bytes are the data) and coloured through the layer's ramp. Coarse grids (temperature, 3 km cells) are upsampled 6× with bilinear interpolation so the surface reads as a field; stepped ramps (rain) stay nearest-neighbour so no value is invented across a threshold. Land-only layers are drawn ~2 cells past CWA's staircase land mask and clipped by a copy of the basemap's water polygons drawn on top (`surface-coast`), so the true coastline cuts them.
 
 **Pictures (radar, satellite).** CWA's 3600² radar PNG (52 MB decoded) is decoded at 1200 or 1800 px depending on the screen, resampled once, and cached ready to blit — on a phone that is the difference between smooth playback and the tab being killed. The 800² satellite JPG takes the same path. Neither is coloured here, so the legend shows radar's dBZ scale read off CWA's palette and, for satellite, only the layer's name and hint.
+
+**Wind.** The uv8 frame is decoded like a grid; its speed goes through `paint` with the wind ramp (Windy's blue → green → yellow → red → purple) as the surface, and its u/v drive particles on a plain 2D canvas appended to the map container: ~1 per 900 screen pixels (at most 2,500), each a position and an age, moved every animation frame by the u/v under it (0.09 px per m/s, the same at every zoom), drawn as a 1.2 px white segment, and respawned at random when it ages out, leaves the field or lands on a missing cell. The trails cost nothing: the canvas keeps 93 % of its own alpha each frame (`destination-in`) before the new segments go on. Screen → world is the linear Mercator mapping of the map's current bounds, so the map never rotates or pitches (both are disabled; nothing here needed a turned map). While the map moves the particles pause and the canvas clears; they reseed when it settles. `prefers-reduced-motion` gets the coloured surface and no particles. The canvas sits above everything the map draws, labels included — a `CustomLayerInterface` is the upgrade if labels must win. Station dots are hidden for frames ahead of now, where there are no readings and nothing to report.
 
 **Humidity.** No CWA grid exists, so the station readings are interpolated in the browser with inverse-distance weighting (1/d²) onto the latest temperature grid's land cells, which gives Taiwan's outline for free. ~3.5k land cells × ~1.2k stations ≈ 4M distances, ~20 ms. A k-nearest index is the upgrade if either count grows 10×.
 
@@ -382,7 +399,8 @@ One Vercel project built from the repository root:
 - `buildCommand`: `pnpm typecheck && pnpm test && pnpm build` — a failing test blocks the deploy
 - `outputDirectory`: `apps/web/dist` (static site)
 - `/api/(.*)` is rewritten to the function at `api/index.ts`, which re-exports the Hono handler; Hono routes on the original path
-- Region `hnd1` (Tokyo), next to the Supabase project
+- `maxDuration: 60` for that function: the wind ingest spends up to 40 s per call, the other routes answer in well under a second
+- Region `hnd1` (Tokyo), next to the Supabase project and to CWA's S3 bucket
 - Security headers on every response (§18)
 
 Push to `main` deploys production. Other branches get preview deployments, which are SSO-protected. Migrations are not applied by the deploy; they are a separate, deliberate `task db:push`.
@@ -427,6 +445,7 @@ What is in place, and what it protects against:
 | All SQL parameterised through Drizzle; the one `sql.raw` uses hard-coded column names | `routes/public.ts` |
 | The forecast proxy cannot be pointed elsewhere: fixed host, dataset from the county map, township URL-encoded | `cwa/client.ts`, `cwa/forecast.ts` |
 | The radar and satellite fetches only follow CWA's own S3 host, no redirects, 5 MB cap, PNG/JPEG signature checked | `ingestion/grids.ts` |
+| The wind files are read from a URL built from a fixed host and a number, by range, `206` or nothing; the GRIB2 reader bounds every length it trusts (message, data section, point count, section sizes) and refuses any layout but the one product's | `ingestion/wind.ts`, `lib/grib.ts` |
 | Generic error bodies; details only in server logs | `app.ts` |
 | Postgres: TLS enforced, RLS on every table with no policies, cron functions `security definer` with empty `search_path` in a non-exposed schema, execute revoked from `public`, secrets in Vault | migrations |
 | Response headers on every route: `Content-Security-Policy` (`default-src 'self'`; connections only to the API, OpenFreeMap and Supabase Storage; `frame-ancestors 'none'`; no inline scripts or styles), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS (Vercel) | `vercel.json` |
@@ -461,7 +480,6 @@ Facts worth knowing:
 
 | Feature | Status | Shape of the work |
 |---|---|---|
-| Wind particles | not started | CWA WRF GRIB2 → GitHub Actions + Python (ecCodes/cfgrib) → U/V field files in Storage → WebGL particle layer; the frames contract already fits |
 | Lightning | not started | `O-A0039-001` KMZ (the past hour's strikes, every 10 min) → a table or per-frame files + a point overlay on the station clock; the placemark format is unseen until a strike happens, and the table once designed for it was dropped on 2026-10-09 so the schema matches what runs |
 
 ---
@@ -478,6 +496,7 @@ Facts worth knowing:
 - **2026-10-09** Satellite layer shipped: the radar ingest became a list of picture products (format, signature and JSON shape per product), and the legend learned to show a picture layer that has no scale.
 - **2026-10-09** Typhoon tracks shipped as a live proxy plus an overlay, not a layer with history: CWA's document already carries the past track, so storing versions would only pay off for a "forecast vs. actual" feature nobody asked for.
 - **2026-10-09** County advisories shipped the same way. County polygons come from taiwan-atlas rather than g0v's twgeojson (2010 names, 766 split geometries) and are simplified on the TopoJSON arcs, so shared borders stay shared and neighbouring counties never show slivers.
+- **2026-10-09** Wind shipped from the API itself rather than the planned GitHub Actions + ecCodes pipeline: probing the WRF file with range requests showed one Lambert grid, plain 24-bit simple packing and no bitmap, which a 120-line reader handles, so no Python, no Actions and no secrets outside the platform. The timeline gained a forecast: "latest" became the last frame at or before now, and frames may lie ahead of it. Particles went on a 2D canvas instead of WebGL — a few thousand segments a frame need no shader.
 
 ---
 

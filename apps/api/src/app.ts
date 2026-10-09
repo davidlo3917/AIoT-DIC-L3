@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import { db } from './db/client.js'
 import { ingestGrids, pruneFrames } from './ingestion/grids.js'
 import { backfillStations, ingestStations } from './ingestion/stations.js'
+import { ingestWind } from './ingestion/wind.js'
 import { ingestAuth } from './middleware/ingestAuth.js'
 import { parse, publicRoutes } from './routes/public.js'
 import { backfillQuery, gridsQuery } from './routes/query.js'
@@ -23,6 +24,8 @@ const app = new Hono().basePath('/api')
   .post('/internal/ingest/stations', async (c) => c.json(await ingestStations()))
   // Grids *and* radar imagery: one cron job fetches everything, a second asks for `?layer=radar` alone.
   .post('/internal/ingest/grids', async (c) => c.json(await ingestGrids(parse(gridsQuery, c.req.query()).layer)))
+  // The WRF wind forecast: 15 lead times, each from CWA's GRIB2 file, within a time budget (vercel.json gives it 60 s).
+  .post('/internal/ingest/wind', async (c) => c.json(await ingestWind()))
   .post('/internal/backfill/stations', async (c) => c.json(await backfillStations(parse(backfillQuery, c.req.query()))))
   .post('/internal/prune/frames', async (c) => c.json(await pruneFrames()))
 

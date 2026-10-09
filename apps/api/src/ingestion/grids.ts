@@ -46,9 +46,10 @@ const GRIDS: GridSpec[] = [
   },
 ]
 
-const pad = (n: number) => String(n).padStart(2, '0')
-const framePath = (layer: string, t: Date, ext = 'png') =>
-  `${layer}/${t.getUTCFullYear()}/${pad(t.getUTCMonth() + 1)}/${pad(t.getUTCDate())}/${pad(t.getUTCHours())}${pad(t.getUTCMinutes())}Z.${ext}`
+export const pad = (n: number, width = 2) => String(n).padStart(width, '0')
+/** `layer/YYYY/MM/DD/HHMMZ.ext`; `suffix` goes between the time and the extension (wind: `/006` for a lead time under its run). */
+export const framePath = (layer: string, t: Date, ext = 'png', suffix = '') =>
+  `${layer}/${t.getUTCFullYear()}/${pad(t.getUTCMonth() + 1)}/${pad(t.getUTCDate())}/${pad(t.getUTCHours())}${pad(t.getUTCMinutes())}Z${suffix}.${ext}`
 
 async function ingestGrid(spec: GridSpec) {
   const g = spec.read((await fetchFileApi(spec.datasetId)).cwaopendata.dataset)

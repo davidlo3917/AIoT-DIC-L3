@@ -27,11 +27,15 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
       maxBounds: [100, 0, 180, 50], // CWA's whole typhoon basin: a track usually starts far out in the Pacific
       // A label whose text changes (25.0 → 25.3) counts as a new one, and would fade in from nothing on every frame.
       fadeDuration: 0,
+      // North stays up: nothing here needs a turned map, and the wind particles map the screen to the world linearly.
+      dragRotate: false, pitchWithRotate: false, touchPitch: false,
       attributionControl: false, // added below, top-right: the default bottom corner sits under the timeline
       locale: { 'Map.Title': t('map.title'), 'NavigationControl.ZoomIn': t('map.zoomIn'), 'NavigationControl.ZoomOut': t('map.zoomOut'), 'AttributionControl.ToggleAttribution': t('map.attribution') },
     })
     // Until the style has arrived any error (the tile host being down) means no map at all; the page says so instead
     // of "loading" forever. A stray tile error is cleared again by `load`.
+    m.touchZoomRotate.disableRotation()
+    m.keyboard.disableRotation()
     m.on('error', () => { if (!m.loaded()) setFailed(true) })
     m.setStyle(STYLE_URL, {
       transformStyle: (_, next) => weatherBasemap(next),

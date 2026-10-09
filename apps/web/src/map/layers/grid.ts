@@ -4,31 +4,57 @@ import { colorOf, type Ramp } from '../../ramps'
 /** A decoded field: row 0 = north. NaN = no data. `bounds` = [west, south, east, north] of the image edges. */
 export type Field = { width: number; height: number; values: Float32Array; bounds: [number, number, number, number] }
 
+/** A wind field: `values` is the speed (what the surface colours), u and v drive the particles. */
+export type WindField = Field & { u: Float32Array; v: Float32Array }
+
 const cache = new Map<string, Promise<Field>>() // frames are immutable per URL; keep the last few decoded
 export function loadField(frame: Frame): Promise<Field> {
   const { url, meta, bounds } = frame
   if (!url || !bounds || meta?.encoding !== 'rg16') return Promise.reject(new Error('frame is not an encoded grid'))
-  let hit = cache.get(url)
+  return remember(cache, url, 40, async () => {
+    const { width, height, offset, scale } = meta, px = await pixels(url, width, height)
+    const values = new Float32Array(width * height)
+    for (let i = 0; i < values.length; i++) values[i] = px[i * 4 + 3] ? ((px[i * 4] << 8) | px[i * 4 + 1]) / scale - offset : NaN
+    return { width, height, values, bounds }
+  })
+}
+
+const winds = new Map<string, Promise<WindField>>()
+export function loadWind(frame: Frame): Promise<WindField> {
+  const { url, meta, bounds } = frame
+  if (!url || !bounds || meta?.encoding !== 'uv8') return Promise.reject(new Error('frame is not a wind field'))
+  return remember(winds, url, 12, async () => {
+    const { width, height } = meta, px = await pixels(url, width, height), n = width * height
+    const u = new Float32Array(n), v = new Float32Array(n), values = new Float32Array(n)
+    for (let i = 0; i < n; i++) { // uv8 (ingestion/wind.ts): R = (u + 64) × 2, G = (v + 64) × 2, B = speed × 4, A = 255 where known
+      const a = px[i * 4 + 3]
+      u[i] = a ? px[i * 4] / 2 - 64 : NaN
+      v[i] = a ? px[i * 4 + 1] / 2 - 64 : NaN
+      values[i] = a ? px[i * 4 + 2] / 4 : NaN
+    }
+    return { width, height, values, u, v, bounds }
+  })
+}
+
+function remember<T>(store: Map<string, Promise<T>>, url: string, keep: number, load: () => Promise<T>) {
+  let hit = store.get(url)
   if (!hit) {
-    hit = decode(url, meta.width, meta.height, meta.offset, meta.scale, bounds)
-    cache.set(url, hit)
-    hit.catch(() => cache.delete(url))
-    if (cache.size > 40) cache.delete(cache.keys().next().value!)
+    hit = load()
+    store.set(url, hit)
+    hit.catch(() => store.delete(url))
+    if (store.size > keep) store.delete(store.keys().next().value!)
   }
   return hit
 }
 
-async function decode(url: string, width: number, height: number, offset: number, scale: number, bounds: Field['bounds']): Promise<Field> {
+async function pixels(url: string, width: number, height: number) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`${url}: ${res.status}`)
   // premultiplyAlpha 'none' + no colour conversion: the bytes ARE the data, any "helpful" adjustment corrupts it.
   const bitmap = await createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
   const ctx = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true })!
   try { ctx.drawImage(bitmap, 0, 0) } finally { bitmap.close() }
-  const px = ctx.getImageData(0, 0, width, height).data
-  const values = new Float32Array(width * height)
-  for (let i = 0; i < values.length; i++) values[i] = px[i * 4 + 3] ? ((px[i * 4] << 8) | px[i * 4 + 1]) / scale - offset : NaN
-  return { width, height, values, bounds }
+  return ctx.getImageData(0, 0, width, height).data
 }
 
 // ---- ready-made images (radar, satellite) ----------------------------------------------------------------------
@@ -40,20 +66,14 @@ const IMAGE_SIZE = Math.max(window.innerWidth, window.innerHeight) * window.devi
 // Cached ready to show (decoded, resized AND redrawn for Mercator), so presenting a frame during playback is one blit.
 const images = new Map<string, Promise<OffscreenCanvas>>()
 export function loadImage(url: string, bounds: Field['bounds']): Promise<OffscreenCanvas> {
-  let hit = images.get(url)
-  if (!hit) {
-    hit = fetch(url).then(async (res) => {
-      if (!res.ok) throw new Error(`${url}: ${res.status}`)
-      const blob = await res.blob()
-      // Older Safari rejects the resize options; fall back to a full-size decode rather than to no radar.
-      const bitmap = await createImageBitmap(blob, { resizeWidth: IMAGE_SIZE, resizeHeight: IMAGE_SIZE, resizeQuality: 'medium' }).catch(() => createImageBitmap(blob))
-      try { return resample(bitmap, bounds) } finally { bitmap.close() }
-    })
-    images.set(url, hit)
-    hit.catch(() => images.delete(url))
-    if (images.size > 8) images.delete(images.keys().next().value!)
-  }
-  return hit
+  return remember(images, url, 8, async () => {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`${url}: ${res.status}`)
+    const blob = await res.blob()
+    // Older Safari rejects the resize options; fall back to a full-size decode rather than to no radar.
+    const bitmap = await createImageBitmap(blob, { resizeWidth: IMAGE_SIZE, resizeHeight: IMAGE_SIZE, resizeQuality: 'medium' }).catch(() => createImageBitmap(blob))
+    try { return resample(bitmap, bounds) } finally { bitmap.close() }
+  })
 }
 
 /** Same Mercator correction as `paint`, for an equirectangular picture: redraw it one row at a time. */
@@ -69,8 +89,8 @@ function resample(bitmap: ImageBitmap, [, south, , north]: Field['bounds']) {
   return canvas
 }
 
-const mercY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))
-const latOfMercY = (y: number) => (Math.atan(Math.exp(y)) * 360) / Math.PI - 90
+export const mercY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))
+export const latOfMercY = (y: number) => (Math.atan(Math.exp(y)) * 360) / Math.PI - 90
 
 /**
  * Colour a field onto a canvas whose rows are evenly spaced in Web-Mercator Y. The source rows are evenly spaced in
