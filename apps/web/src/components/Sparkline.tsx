@@ -3,7 +3,7 @@ import { useT } from '../i18n'
 import { chartExtent } from './chartData'
 
 type Point = { t: number; v: number }
-const W = 350, H = 72, PAD = { l: 4, r: 4, t: 8, b: 14 }
+const W = 384, H = 72, PAD = { l: 4, r: 4, t: 8, b: 14 }
 
 /** One series, so no legend: the card title names it. 2px line, recessive axis, crosshair + tooltip on hover/touch. */
 export default function Sparkline({ points, unit, bars, format, selectedTime }: { points: Point[]; unit: string; bars?: boolean; format: (v: number) => string; selectedTime?: string }) {

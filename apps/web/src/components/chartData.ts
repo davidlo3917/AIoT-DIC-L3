@@ -1,4 +1,4 @@
-import type { Observation } from '../api'
+import type { ForecastPeriod, Observation } from '../api'
 
 export const stationSnapshot = (observations: Observation[], stationId: number) => observations.find((o) => o.stationId === stationId) ?? null
 
@@ -22,4 +22,23 @@ export function weatherIcon(text: string, start: string) {
   if (text.startsWith('晴')) return night ? '🌙' : text.includes('雲') ? '🌤️' : '☀️'
   if (text.startsWith('多雲') && text.includes('晴')) return night ? '☁️' : '⛅'
   return '☁️' // 多雲, 陰
+}
+
+export type ForecastDay = { noon: number; day?: ForecastPeriod; night?: ForecastPeriod }
+const HOUR = 3600e3, DAY = 24 * HOUR
+
+/**
+ * CWA's 12-hour periods as one column per Taiwan day: 06–18 is the day, 18–06 that day's night, and an overnight
+ * 00–06 period (asked for after midnight) belongs to the evening before. `noon` names the day for formatting.
+ */
+export function forecastDays(periods: ForecastPeriod[]): ForecastDay[] {
+  const days = new Map<number, ForecastDay>()
+  for (const p of periods) {
+    const shifted = Date.parse(p.start) + 8 * HOUR - 6 * HOUR // Taipei (UTC+8, no DST), with the day starting at 06:00
+    const n = Math.floor(shifted / DAY)
+    const d = days.get(n) ?? { noon: n * DAY + 4 * HOUR } // 12:00 Taipei is 04:00 UTC
+    d[shifted - n * DAY < 12 * HOUR ? 'day' : 'night'] = p
+    days.set(n, d)
+  }
+  return [...days.values()]
 }

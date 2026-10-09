@@ -12,8 +12,12 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   return res.json()
 }
 
+export const PLAYBACK_DAYS = 7 // what the database keeps
+// The start of the playback window, rounded down to the hour so every visitor in that hour asks the CDN the same URL.
+const since = () => new Date(Math.floor((Date.now() - PLAYBACK_DAYS * 86400e3) / 3600e3) * 3600e3).toISOString()
+
 export const getStations = () => get<Station[]>('/stations')
-export const getFrames = (layer: FrameLayer, signal?: AbortSignal) => get<{ frames: Frame[] }>(`/frames?layer=${layer}`, signal).then((r) => r.frames)
+export const getFrames = (layer: FrameLayer, signal?: AbortSignal) => get<{ frames: Frame[] }>(`/frames?layer=${layer}&from=${since()}`, signal).then((r) => r.frames)
 // One request per instant, shared by the station dots, the humidity surface and the playback preloader. Not abortable:
 // the server runs an abandoned query to the end anyway, so aborting only threw away an answer replay would want.
 const observations = new Map<string, Promise<Observation[]>>()
@@ -35,4 +39,5 @@ export function getObservations(at: string): Promise<Observation[]> {
 export type ForecastPeriod = { start: string; end: string; weather: string | null; weatherCode: string | null; min: number | null; max: number | null; rainChance: number | null }
 export const getForecast = (county: string, town: string, signal?: AbortSignal) =>
   get<{ periods: ForecastPeriod[] }>(`/forecast?county=${encodeURIComponent(county)}&town=${encodeURIComponent(town)}`, signal).then((r) => r.periods)
-export const getHistory = (cwaId: string, signal?: AbortSignal) => get<{ observations: (Readings & { observedAt: string })[] }>(`/stations/${cwaId}/history`, signal).then((r) => r.observations)
+/** The station's whole playback window, fetched once per card: the chart then follows the map time without refetching. */
+export const getHistory = (cwaId: string, signal?: AbortSignal) => get<{ observations: (Readings & { observedAt: string })[] }>(`/stations/${cwaId}/history?from=${since()}`, signal).then((r) => r.observations)

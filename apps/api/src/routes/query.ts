@@ -3,7 +3,7 @@ import { COUNTY_FORECASTS } from '../cwa/forecast.js'
 
 const instant = z.iso.datetime({ offset: true }).transform((s) => new Date(s))
 
-export const MAX_RANGE_DAYS = 62 // a little over the hourly retention window
+export const MAX_RANGE_DAYS = 8 // a little over the 7-day retention window
 
 /** `?from=&to=` — ISO-8601 with offset. Defaults to the last 24 h ending now. */
 export const rangeQuery = z.object({ from: instant.optional(), to: instant.optional() }).transform((q, ctx) => {

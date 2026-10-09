@@ -55,8 +55,8 @@ export function createTimelineStore() {
       if (state.frames.length < 2) return
       let index = state.index
       if (!state.playing && index >= state.frames.length - 1) {
-        // From the newest frame, Play replays the layer's recent loop rather than the whole day (24 h of 10-minute
-        // frames takes 99 s). At least one step back, so there is always something to play.
+        // From the newest frame, Play replays the layer's recent loop rather than the whole week (7 days of 10-minute
+        // frames take 12 minutes). At least one step back, so there is always something to play.
         const from = Date.parse(state.frames[index].time) - LAYERS[state.layer].loop * 3600e3
         index = Math.min(state.frames.length - 2, state.frames.findIndex((f) => Date.parse(f.time) >= from))
       }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PLAYBACK_DAYS } from '../api'
 import { useT } from '../i18n'
 import { LAYERS } from '../layers'
 import { STATUS, type Status } from '../status'
@@ -12,7 +13,7 @@ const ICONS = { prev: 'M6 5h2v14H6zM20 5v14L9 12z', play: 'M8 5v14l11-7z', pause
 const Icon = ({ d }: { d: string }) => <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true"><path d={d} /></svg>
 
 export default function Timeline({ status }: { status: Status }) {
-  const { t, age, dayTime, fullTime, weekdayTime } = useT()
+  const { t, age, dayTime, fullTime, shortDayTime } = useT()
   const frames = useStore((s) => s.frames), index = useStore((s) => s.index), playing = useStore((s) => s.playing), speed = useStore((s) => s.speed)
   const frame = useStore(currentFrame)
   const loadState = useStore((s) => s.loadState), followLatest = useStore((s) => s.followLatest)
@@ -49,11 +50,12 @@ export default function Timeline({ status }: { status: Status }) {
 
   // Playback itself is driven from useWeather, which knows when a frame is actually on the map.
   const last = frames.length - 1, following = followLatest && index === last
-  // How far back the slider reaches, counted from now: hourly data arrives an hour late, so its 23 or 24 frames are
-  // still "the past 24 h". Never more than the 24 h the API serves, however stale the list is.
-  const hours = frames[0] ? Math.min(24, Math.ceil((now - Date.parse(frames[0].time)) / 3600e3)) : 0
+  // How far back the slider reaches, counted from now: in days once it spans more than a day and a half (rounded, as
+  // the window starts on the hour), in hours before that, while a layer's history is still building up.
+  const span = frames[0] ? now - Date.parse(frames[0].time) : 0
+  const reach = span > 36 * 3600e3 ? t('timeline.days', { days: Math.min(PLAYBACK_DAYS, Math.round(span / 86400e3)) }) : t('timeline.hours', { hours: Math.ceil(span / 3600e3) })
   // A young layer has little to play; say so, or a Play button that is disabled (or done in one step) looks broken.
-  const history = frames.length > 5 ? t('timeline.past', { hours, every })
+  const history = frames.length > 5 ? t('timeline.past', { reach, every })
     : frames.length > 1 ? t('timeline.few', { n: frames.length, every })
     : frames.length === 1 ? t('timeline.one', { every })
     : t(loadState === 'loading' ? 'timeline.loading' : loadState === 'empty' ? 'timeline.none' : 'timeline.unavailable')
@@ -93,10 +95,11 @@ export default function Timeline({ status }: { status: Status }) {
       </div>}
       <input type="range" min={0} max={Math.max(0, last)} value={Math.max(0, index)} onChange={(e) => actions.seek(Number(e.target.value))} disabled={last < 1}
         aria-label={t('timeline.time')} aria-valuetext={frame ? fullTime.format(at(frame.time)) : undefined} className="block h-11 w-full" />
-      <div className="flex justify-between text-[13px] tabular-nums text-slate-400">
-        <span>{frames[0] ? weekdayTime.format(at(frames[0].time)) : ''}</span>
+      <div className="flex justify-between gap-2 text-[13px] tabular-nums text-slate-400">
+        {/* Dates, not weekdays: a week back is the same weekday as today. */}
+        <span className="whitespace-nowrap">{frames[0] ? shortDayTime.format(at(frames[0].time)) : ''}</span>
         <span className={frames.length > 0 && frames.length <= 5 ? 'px-2 text-center text-amber-300' : undefined}>{history}</span>
-        <span>{frames[last] ? weekdayTime.format(at(frames[last].time)) : ''}</span>
+        <span className="whitespace-nowrap">{frames[last] ? shortDayTime.format(at(frames[last].time)) : ''}</span>
       </div>
     </section>
   )

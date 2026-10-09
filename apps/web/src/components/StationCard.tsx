@@ -5,14 +5,15 @@ import { LAYERS } from '../layers'
 import { RAMPS, type Variable } from '../ramps'
 import { actions, currentFrame, useStore } from '../timeline/store'
 import Sparkline from './Sparkline'
-import { stationSnapshot, weatherIcon } from './chartData'
+import { forecastDays, stationSnapshot, weatherIcon, type ForecastDay } from './chartData'
 
 type Row = Readings & { observedAt: string }
 const FIELD: Record<Variable, keyof Readings> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h' }
 const MOUNTAIN_M = 1000 // above this a station reads well below its township's forecast (玉山 sits in 信義鄉)
+const DAY = 86400e3
 
 export default function StationCard({ stations }: { stations: Station[] }) {
-  const { t, dayTime, period } = useT()
+  const { t, dayTime, weekday, monthDay } = useT()
   const id = useStore((s) => s.selectedStation), variable = LAYERS[useStore((s) => s.layer)].stations
   const station = stations.find((s) => s.id === id)
   const [rows, setRows] = useState<Row[] | 'error' | null>(null)
@@ -58,11 +59,19 @@ export default function StationCard({ stations }: { stations: Station[] }) {
   const current = snapshot?.time === frame?.time ? snapshot : null
   const num = (k: keyof Readings, digits = 1) => { const v = current?.value?.[k]; return v == null ? '—' : v.toFixed(digits) }
   const dir = current?.value?.windDirection, compass = t('compass').split(',')
-  const now = Date.now(), upcoming = Array.isArray(forecast) ? forecast.filter((p) => Date.parse(p.end) > now).slice(0, 4) : []
-  const points = data.flatMap((r) => { const v = r[FIELD[variable]]; return v == null ? [] : [{ t: Date.parse(r.observedAt), v }] })
+  const now = Date.now()
+  const week = Array.isArray(forecast) ? forecastDays(forecast.filter((p) => Date.parse(p.end) > now)).slice(0, 7) : []
+  // The chart shows the 24 h around the map time out of the week fetched: the last 24 h while following now,
+  // centred on the map time when it is further back, so its dashed line is always on the chart.
+  const end = Math.min(now, (frame ? Date.parse(frame.time) : now) + DAY / 2), start = end - DAY
+  const points = data.flatMap((r) => {
+    const t = Date.parse(r.observedAt), v = r[FIELD[variable]]
+    return v == null || t < start || t > end ? [] : [{ t, v }]
+  })
+  const today = Math.floor((now + 8 * 3600e3) / DAY) // Taiwan's calendar day
 
   return (
-    <aside aria-label={t('station.label', { name: station.name })} className="weather-panel pointer-events-auto max-h-[55dvh] w-full overflow-y-auto p-4 sm:max-h-none sm:w-96 sm:max-w-full">
+    <aside aria-label={t('station.label', { name: station.name })} className="weather-panel pointer-events-auto max-h-[55dvh] w-full overflow-y-auto p-4 sm:max-h-none sm:w-[26rem] sm:max-w-full">
       <header className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="truncate text-lg font-semibold">{station.name}</h2>
@@ -85,20 +94,30 @@ export default function StationCard({ stations }: { stations: Station[] }) {
           {forecast === null ? <p className="ui-muted py-1 text-sm">{t('forecast.loading')}</p> : forecast === 'error'
             ? <p className="text-sm text-amber-200">{t('forecast.failed')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>
             : (
-              <ul className="grid grid-cols-4 gap-1.5">
-                {upcoming.map((p) => (
-                  <li key={p.start} className="flex min-w-0 flex-col items-center rounded-lg bg-white/5 px-1 py-1.5 text-center">
-                    <span className="text-[13px] text-slate-400">{period(Date.parse(p.start), now)}</span>
-                    <span aria-hidden="true" className="my-0.5 text-2xl leading-none">{p.weather ? weatherIcon(p.weather, p.start) : '—'}</span>
-                    <span className="line-clamp-2 text-[13px] leading-tight">{p.weather ?? '—'}</span>
-                    <span className="mt-auto pt-1 whitespace-nowrap tabular-nums"><span className="font-semibold">{p.max ?? '—'}°</span> <span className="text-slate-400">{p.min ?? '—'}°</span></span>
-                    {/* Worth noticing from 30 % up, where people start to pack an umbrella. */}
-                    <span className={`whitespace-nowrap text-[13px] tabular-nums ${(p.rainChance ?? 0) >= 30 ? 'font-medium text-sky-300' : 'text-slate-400'}`} title={t('forecast.rain')}>
-                      <span aria-hidden="true">☂ </span><span className="sr-only">{t('forecast.rain')} </span>{p.rainChance == null ? '—' : `${p.rainChance}%`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <table className="w-full table-fixed border-separate border-spacing-x-0.5 text-center text-sm">
+                <colgroup><col className="w-8" />{week.map((d) => <col key={d.noon} />)}</colgroup>
+                <thead>
+                  <tr>
+                    <td />
+                    {week.map((d) => (
+                      <th key={d.noon} scope="col" className="pb-1 font-normal leading-tight">
+                        <span className={Math.floor((d.noon + 8 * 3600e3) / DAY) === today ? 'font-semibold text-slate-100' : 'text-slate-300'}>
+                          {Math.floor((d.noon + 8 * 3600e3) / DAY) === today ? t('forecast.today') : weekday.format(d.noon)}
+                        </span>
+                        <span className="block text-xs text-slate-500">{monthDay.format(d.noon)}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(['day', 'night'] as const).map((part) => (
+                    <tr key={part}>
+                      <th scope="row" className="text-left text-xs font-normal text-slate-400 [writing-mode:vertical-rl]">{t(`forecast.${part}`)}</th>
+                      {week.map((d) => <ForecastCell key={d.noon} p={d[part]} part={part} />)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           {(station.elevation ?? 0) >= MOUNTAIN_M && <p className="mt-1 text-[13px] text-slate-400">{t('forecast.mountain')}</p>}
         </section>
@@ -108,5 +127,24 @@ export default function StationCard({ stations }: { stations: Station[] }) {
         ? <p className="text-sm text-amber-200">{t('station.history.failed')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>
         : <Sparkline points={points} unit={ramp.unit} bars={variable === 'rain'} format={ramp.format} selectedTime={frame?.time} />}
     </aside>
+  )
+}
+
+/** One half-day: an icon, the half's temperature (the high by day, the low by night) and the chance of rain. */
+function ForecastCell({ p, part }: { p: ForecastDay['day']; part: 'day' | 'night' }) {
+  const { t } = useT()
+  if (!p) return <td className="text-slate-600">—</td>
+  const temp = part === 'day' ? p.max : p.min, wet = (p.rainChance ?? 0) >= 30 // where people start to pack an umbrella
+  return (
+    <td className={`rounded-md py-1 ${part === 'day' ? 'bg-white/5' : 'bg-white/[0.02]'}`} title={p.weather ?? undefined}>
+      <span aria-hidden="true" className="block text-xl leading-tight">{p.weather ? weatherIcon(p.weather, p.start) : '—'}</span>
+      <span className="sr-only">{p.weather}</span>
+      <span className={`block tabular-nums ${part === 'day' ? 'font-semibold' : 'text-slate-300'}`}>{temp ?? '—'}°</span>
+      {p.rainChance != null && (
+        <span className={`block text-xs tabular-nums ${wet ? 'font-medium text-sky-300' : 'text-slate-500'}`}>
+          <span aria-hidden="true">☂</span><span className="sr-only">{t('forecast.rain')} </span>{p.rainChance}%
+        </span>
+      )}
+    </td>
   )
 }

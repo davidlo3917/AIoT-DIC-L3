@@ -35,12 +35,16 @@ export default function App() {
         </header>
         {/* The one region that gives: its panels shrink and scroll, so the legend and timeline below never leave the screen. */}
         <div className="flex min-h-0 flex-1 flex-col gap-2 sm:flex-row">
-          {/* pr-14 keeps the phone's layer row clear of the map controls. */}
-          <div className="flex min-h-0 min-w-0 shrink-0 flex-col pr-14 sm:pr-0"><LayerPanel /></div>
+          {/* pr-14 keeps the phone's layer row clear of the map controls. On roomy screens the legend sits under the
+              layer list, so the station card on the other side can reach down to the timeline. */}
+          <div className="flex min-h-0 min-w-0 shrink-0 flex-col pr-14 sm:pr-0">
+            <LayerPanel />
+            <div className="mt-auto hidden pt-2 desk:block"><Legend /></div>
+          </div>
           <div className="mt-auto flex min-h-0 min-w-0 flex-col sm:mr-16 sm:mt-0 sm:ml-auto"><StationCard key={selectedStation} stations={stations} /></div>
         </div>
-        {/* On compact layouts this row makes way for an open station card. */}
-        <div className={`${selectedStation !== null ? 'hidden desk:flex' : 'flex'} flex-row-reverse items-end justify-between gap-2 sm:flex-row sm:justify-start`}>
+        {/* Compact layouts only; it makes way for an open station card. */}
+        <div className={`${selectedStation !== null ? 'hidden' : 'flex'} flex-row-reverse items-end justify-between gap-2 sm:flex-row sm:justify-start desk:hidden`}>
           <Legend />
           <div className="weather-panel pointer-events-auto desk:hidden"><StationsToggle className="flex" /></div>
         </div>

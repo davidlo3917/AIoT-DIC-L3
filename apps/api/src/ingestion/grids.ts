@@ -126,7 +126,7 @@ export async function ingestGrids(only?: GridLayer) {
   return results.map((r, i) => r.status === 'fulfilled' ? r.value : (console.error(`ingest ${jobs[i].layer} failed:`, r.reason), { layer: jobs[i].layer, error: true }))
 }
 
-export const FRAME_RETENTION_DAYS = 14 // free-tier Storage is 1 GB
+export const FRAME_RETENTION_DAYS = 7 // what the timeline plays back; free-tier Storage is 1 GB
 
 export async function pruneFrames() {
   const cutoff = new Date(Date.now() - FRAME_RETENTION_DAYS * 86400e3)
