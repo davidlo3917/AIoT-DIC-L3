@@ -6,7 +6,7 @@ import type { Station } from '../api'
 import { useT } from '../i18n'
 import { STATUS, type Status } from '../status'
 import { useWeather } from './useWeather'
-import { setPlaceLanguage, weatherBasemap } from './basemap'
+import { weatherBasemap } from './basemap'
 
 setWorkerUrl(workerUrl)
 
@@ -17,10 +17,8 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/fiord'
 const BOUNDS: [number, number, number, number] = [115, 17.75, 126.5, 29.25]
 
 export default function MapView({ stations, onStatus }: { stations: Station[]; onStatus: (s: Status) => void }) {
-  const { t, lang } = useT()
+  const { t } = useT()
   const el = useRef<HTMLDivElement>(null)
-  const langNow = useRef(lang) // read when the style arrives, which is after this render
-  langNow.current = lang
   const [map, setMap] = useState<MapLibreMap | null>(null)
 
   useEffect(() => {
@@ -33,7 +31,7 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
       attributionControl: false, // added below, top-right: the default bottom corner sits under the timeline
     })
     m.setStyle(STYLE_URL, {
-      transformStyle: (_, next) => weatherBasemap(next, langNow.current),
+      transformStyle: (_, next) => weatherBasemap(next),
     })
     m.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     m.addControl(new AttributionControl({ compact: true }), 'top-right')
@@ -44,8 +42,7 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
     return () => { setMap(null); m.remove() }
   }, [])
 
-  // MapLibre names its controls once, in English. They are few, so they are simply renamed in place, which also
-  // follows a language switch without rebuilding the map.
+  // MapLibre names its controls once, in English. They are few, so they are simply renamed in place.
   useEffect(() => {
     const names = { '.maplibregl-ctrl-zoom-in': 'map.zoomIn', '.maplibregl-ctrl-zoom-out': 'map.zoomOut', '.maplibregl-ctrl-attrib-button': 'map.attribution', '.maplibregl-canvas': 'map.title' } as const
     for (const [selector, key] of Object.entries(names) as [string, (typeof names)[keyof typeof names]][]) {
@@ -55,7 +52,6 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
       if (control.title) control.title = t(key)
     }
   }, [t])
-  useEffect(() => { if (map) setPlaceLanguage(map, lang) }, [map, lang])
 
   const status = useWeather(map, stations)
   // Until the map exists the timeline may already be loaded; say why there is no weather to see yet.

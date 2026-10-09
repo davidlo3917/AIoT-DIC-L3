@@ -4,25 +4,58 @@ import { mapExpression, RAMPS, type Variable } from '../../ramps'
 
 const SOURCE = 'stations', DOTS = 'station-dots', LABELS = 'station-values'
 const FIELD: Record<Variable, keyof Observation> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h' }
+// Zoomed out, only the most relevant stations are drawn, at least SPACING px apart; each zoom level in adds the next
+// most relevant ones that fit, and from ALL_ZOOM on every station is drawn.
+const FIRST_ZOOM = 5, ALL_ZOOM = 11, SPACING = 44
+const WORLD = 512 // MapLibre's world size in px at zoom 0
+
+/**
+ * The zoom from which each point is drawn. Points come most relevant first; once drawn at a zoom, a point stays drawn
+ * at every closer one, so zooming in only ever adds stations.
+ */
+export function minZooms(points: [lon: number, lat: number][]): number[] {
+  const xy = points.map(([lon, lat]) => [(lon + 180) / 360, (1 - Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) / Math.PI) / 2])
+  const from = points.map(() => ALL_ZOOM)
+  for (let z = FIRST_ZOOM; z < ALL_ZOOM; z++) {
+    const scale = WORLD * 2 ** z / SPACING // one grid cell = SPACING px, so only the 3×3 cells around a point can be too close
+    const cells = new Map<string, number[][]>()
+    const place = (x: number, y: number) => { const k = `${Math.floor(x)},${Math.floor(y)}`; cells.set(k, [...cells.get(k) ?? [], [x, y]]) }
+    const crowded = (x: number, y: number) => {
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        for (const [a, b] of cells.get(`${Math.floor(x) + dx},${Math.floor(y) + dy}`) ?? []) if ((a - x) ** 2 + (b - y) ** 2 < 1) return true
+      }
+      return false
+    }
+    xy.forEach(([x, y], i) => { if (from[i] < z) place(x * scale, y * scale) })
+    xy.forEach(([x, y], i) => { if (from[i] >= z && !crowded(x * scale, y * scale)) { place(x * scale, y * scale); from[i] = z } })
+  }
+  return from
+}
+
+// CWA's staffed stations (46xxxx: 臺北, 臺中, 高雄…) are the ones people know, then its automatic stations (C0), then
+// everyone else's. Within a tier the lower station wins, which favours the town over the peak above it.
+const tier = (s: Station) => s.cwaStationId.startsWith('46') ? 0 : s.cwaStationId.startsWith('C0') ? 1 : 2
+const byRelevance = (variable: Variable) => (a: { s: Station; v: number }, b: { s: Station; v: number }) =>
+  variable === 'rain' ? b.v - a.v // where it rains hardest
+    : tier(a.s) - tier(b.s) || (a.s.elevation ?? Infinity) - (b.s.elevation ?? Infinity) || a.s.id - b.s.id
 
 export function addStationLayers(map: MapLibreMap, onSelect: (stationId: number | null) => void) {
   map.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
   map.addLayer({
-    id: DOTS, type: 'circle', source: SOURCE, minzoom: 8,
+    id: DOTS, type: 'circle', source: SOURCE,
     layout: { visibility: 'none' },
+    // Hidden stations are filtered out, not made transparent, so they cannot intercept clicks either.
+    filter: ['>=', ['zoom'], ['get', 'minzoom']],
     paint: {
       // Sized to be read and tapped at city scale, where people actually look at single stations.
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 4.5, 10, 7.5, 13, 11],
       'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 2],
       'circle-stroke-color': '#0b1220',
       'circle-color': '#ffffff',
-      // The minzoom also prevents invisible dots from intercepting island-scale clicks.
-      'circle-opacity': 1,
-      'circle-stroke-opacity': 1,
     },
   })
   map.addLayer({
-    id: LABELS, type: 'symbol', source: SOURCE, minzoom: 9,
+    id: LABELS, type: 'symbol', source: SOURCE, filter: ['>=', ['zoom'], ['get', 'minzoom']],
     // Anchored by its bottom edge so the value clears the dot at every size of both.
     layout: { visibility: 'none', 'text-field': ['get', 'label'], 'text-size': ['interpolate', ['linear'], ['zoom'], 9, 12.5, 12, 15],
       'text-anchor': 'bottom', 'text-offset': [0, -0.85], 'text-font': ['Noto Sans Regular'] },
@@ -55,17 +88,17 @@ export function setStationsVisible(map: MapLibreMap, visible: boolean) {
 export function updateStations(map: MapLibreMap, stations: Station[], observations: Observation[], variable: Variable, visible: boolean) {
   const ramp = RAMPS[variable], field = FIELD[variable]
   const byId = new Map(observations.map((o) => [o.stationId, o]))
+  const shown = stations.flatMap((s) => {
+    const v = byId.get(s.id)?.[field] as number | null | undefined
+    // Dry gauges would bury the map in dots; for rain only show where it is actually raining.
+    return v == null || (variable === 'rain' && v < 0.5) ? [] : [{ s, v }]
+  }).sort(byRelevance(variable))
+  const from = minZooms(shown.map(({ s }) => [s.longitude, s.latitude]))
   ;(map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData({
     type: 'FeatureCollection',
-    features: stations.flatMap((s) => {
-      const v = byId.get(s.id)?.[field] as number | null | undefined
-      if (v == null) return []
-      return [{ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [s.longitude, s.latitude] }, properties: { id: s.id, value: v, label: ramp.format(v) } }]
-    }),
+    features: shown.map(({ s, v }, i) => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [s.longitude, s.latitude] },
+      properties: { id: s.id, value: v, label: ramp.format(v), minzoom: from[i] } })),
   })
   map.setPaintProperty(DOTS, 'circle-color', mapExpression(ramp, 'value') as never)
-  // Dry gauges would bury the map in dots; for rain only show where it is actually raining.
-  map.setFilter(DOTS, variable === 'rain' ? ['>=', ['get', 'value'], 0.5] : null)
-  map.setFilter(LABELS, variable === 'rain' ? ['>=', ['get', 'value'], 0.5] : null)
   setStationsVisible(map, visible)
 }

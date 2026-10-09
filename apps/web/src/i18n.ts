@@ -1,65 +1,6 @@
-import { useStore } from './timeline/store'
-
-export type Lang = 'zh-Hant' | 'en'
-
-// Every sentence a person can read or a screen reader can speak. Layer, variable and interval keys are built by
-// convention (`layer.<id>`, `layer.<id>.hint`, `var.<variable>`, `every.<minutes>`), which the type check still covers.
-export const en = {
-  'app.title': 'Weather Taiwan',
-  'app.source': 'Data: Central Weather Administration (CWA)',
-  retry: 'Retry',
-  close: 'Close',
-
-  'layers.label': 'Weather layers',
-  'layer.temperature': 'Temperature', 'layer.temperature.hint': 'Air temperature, hourly',
-  'layer.rain': 'Rain', 'layer.rain.hint': 'Rain in the past hour',
-  'layer.radar': 'Radar', 'layer.radar.hint': 'Where it is raining now',
-  'layer.humidity': 'Humidity', 'layer.humidity.hint': 'Estimated between stations',
-  'legend.label': '{name} scale from {lo} to {hi} {unit}. {hint}',
-  'stations.toggle': 'Stations', 'stations.zoomHint': 'zoom in', 'stations.title': 'Visible when zoomed in',
-
-  'timeline.label': 'Timeline',
-  'timeline.prev': 'Previous frame', 'timeline.next': 'Next frame', 'timeline.play': 'Play', 'timeline.pause': 'Pause',
-  'key.space': 'Space',
-  'timeline.live': 'Live', 'timeline.live.title': 'Showing the newest data as it arrives',
-  'timeline.latest': 'Back to latest', 'timeline.latest.title': 'Jump to the newest data and keep following it',
-  'timeline.speed': 'Speed', 'timeline.speed.label': 'Playback speed', 'timeline.time': 'Time',
-  'every.10': 'every 10 min', 'every.60': 'every hour',
-  'timeline.past': 'Past {hours} h · {every}',
-  'timeline.few': '{n} frames so far — history is still building, one more {every}',
-  'timeline.one': 'Only one frame so far, so nothing to play yet — a new one arrives {every}',
-  'timeline.loading': 'Loading timeline…', 'timeline.none': 'No frames available yet', 'timeline.unavailable': 'Timeline unavailable',
-  'age.now': 'just now',
-
-  'status.loadingMap': 'Loading map…',
-  'status.loadingWeather': 'Loading weather…',
-  'status.timelineError': 'Could not refresh the timeline',
-  'status.empty': 'New data will appear as it becomes available.',
-  'status.noData': 'No data for this time',
-  'status.noHumidity': 'Humidity is not available yet',
-  'status.noStationReadings': 'No station readings for this time',
-  'status.stationReadingsFailed': 'Could not load station readings',
-  'status.stationsFailed': 'Could not load the station list',
-
-  'station.label': '{name} station',
-  'station.asOf': 'As of {time} · UTC+8', 'station.noTime': 'Select a map time',
-  'station.loading': 'Loading readings…', 'station.failed': 'Could not load readings.', 'station.none': 'No readings for this time.',
-  'station.temp': 'Temp', 'station.humidity': 'Humidity', 'station.pressure': 'Pressure',
-  'station.wind': 'Wind', 'station.rain1h': 'Rain 1 h', 'station.rain24h': 'Rain 24 h',
-  compass: 'N,NE,E,SE,S,SW,W,NW', // eight points, clockwise from north
-  'var.temperature': 'Temperature', 'var.humidity': 'Humidity', 'var.rain': 'Rain',
-  'station.chart': '{name}, last 24 h · dashed line: map time',
-  'station.history.loading': 'Loading history…', 'station.history.failed': 'Could not load history.',
-  'chart.short': 'Not enough history yet — a new reading arrives every 10 minutes.',
-  'chart.label': 'Last 24 hours, {min} to {max} {unit}', 'chart.mapTime': '; map time {time}',
-  'chart.selected': 'Selected map time', 'chart.range': 'min {min} · max {max} {unit}',
-
-  'map.title': 'Map', 'map.zoomIn': 'Zoom in', 'map.zoomOut': 'Zoom out', 'map.attribution': 'Map credits',
-}
-export type Key = keyof typeof en
-
-/** Typed against `en`: a missing or misspelt key fails the type check. Station and town names are CWA's and stay Chinese. */
-export const zh: Record<Key, string> = {
+// Every sentence a person can read or a screen reader can speak, in Taiwan Mandarin. Layer, variable and interval keys are
+// built by convention (`layer.<id>`, `layer.<id>.hint`, `var.<variable>`, `every.<minutes>`), which the type check still covers.
+export const zh = {
   'app.title': '臺灣天氣',
   'app.source': '資料來源：中央氣象署',
   retry: '重試',
@@ -71,7 +12,7 @@ export const zh: Record<Key, string> = {
   'layer.radar': '雷達', 'layer.radar.hint': '目前哪裡在下雨',
   'layer.humidity': '濕度', 'layer.humidity.hint': '由測站資料推估',
   'legend.label': '{name}色階，{lo} 到 {hi} {unit}。{hint}',
-  'stations.toggle': '測站', 'stations.zoomHint': '放大顯示', 'stations.title': '放大地圖後才會顯示',
+  'stations.toggle': '測站', 'stations.zoomHint': '放大看更多', 'stations.title': '縮小時只顯示主要測站，放大地圖可看到更多',
 
   'timeline.label': '時間軸',
   'timeline.prev': '上一個時間', 'timeline.next': '下一個時間', 'timeline.play': '播放', 'timeline.pause': '暫停',
@@ -112,34 +53,29 @@ export const zh: Record<Key, string> = {
   'map.title': '地圖', 'map.zoomIn': '放大', 'map.zoomOut': '縮小', 'map.attribution': '地圖資料來源',
 }
 
-const DICT = { 'zh-Hant': zh, en }
-const LOCALE = { 'zh-Hant': 'zh-TW', en: 'en-GB' }
+export type Key = keyof typeof zh
 type Params = Record<string, string | number>
 
 /** Fills `{name}` placeholders. One left unfilled stays visible, so a forgotten parameter is noticed rather than silently blank. */
-export const translate = (lang: Lang, key: Key, params: Params = {}) =>
-  DICT[lang][key].replace(/\{(\w+)\}/g, (hole, name: string) => name in params ? String(params[name]) : hole)
+export const translate = (key: Key, params: Params = {}) =>
+  zh[key].replace(/\{(\w+)\}/g, (hole, name: string) => name in params ? String(params[name]) : hole)
 
-function bind(lang: Lang) {
-  // Always Taiwan time: the data is about Taiwan, wherever the viewer's laptop thinks it is.
-  // h23: midnight is 00:00 (zh-TW prints 24:00 with `hour12: false`).
-  const clock = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(LOCALE[lang], { timeZone: 'Asia/Taipei', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', ...o })
-  const ago = new Intl.RelativeTimeFormat(LOCALE[lang])
-  const t = (key: Key, params?: Params) => translate(lang, key, params)
-  return {
-    lang, t,
-    time: clock({}), // 13:50
-    weekdayTime: clock({ weekday: 'short' }), // Sun 13:50 — the ends of a 24 h range, where a bare time does not say which day
-    dayTime: clock({ day: 'numeric', month: 'short' }), // 5 Oct, 13:50
-    fullTime: clock({ weekday: 'short', day: 'numeric', month: 'short' }), // Mon 5 Oct, 13:50
-    /** How old a frame is: minutes up to an hour and a half, hours beyond. A viewer's clock running behind must not read as "in 3 minutes". */
-    age(time: number, now: number) {
-      const min = Math.round((now - time) / 60e3)
-      return min <= 0 ? t('age.now') : min < 90 ? ago.format(-min, 'minute') : ago.format(-Math.round(min / 60), 'hour')
-    },
-  }
+// Always Taiwan time: the data is about Taiwan, wherever the viewer's laptop thinks it is.
+// h23: midnight is 00:00 (zh-TW prints 24:00 with `hour12: false`).
+const clock = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', ...o })
+const ago = new Intl.RelativeTimeFormat('zh-TW')
+
+// ponytail: Chinese only (the English switch was removed); `useT` stays so call sites did not change.
+export const I18N = {
+  t: translate,
+  time: clock({}), // 13:50
+  weekdayTime: clock({ weekday: 'short' }), // 週一 13:50 — the ends of a 24 h range, where a bare time does not say which day
+  dayTime: clock({ day: 'numeric', month: 'short' }), // 10月5日 13:50
+  fullTime: clock({ weekday: 'short', day: 'numeric', month: 'short' }), // 10月5日 週一 13:50
+  /** How old a frame is: minutes up to an hour and a half, hours beyond. A viewer's clock running behind must not read as "in 3 minutes". */
+  age(time: number, now: number) {
+    const min = Math.round((now - time) / 60e3)
+    return min <= 0 ? zh['age.now'] : min < 90 ? ago.format(-min, 'minute') : ago.format(-Math.round(min / 60), 'hour')
+  },
 }
-
-// Built once per language, so `t` and the formatters keep their identity across renders.
-export const I18N = { 'zh-Hant': bind('zh-Hant'), en: bind('en') }
-export const useT = () => I18N[useStore((s) => s.lang)]
+export const useT = () => I18N

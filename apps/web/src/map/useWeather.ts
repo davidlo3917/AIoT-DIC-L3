@@ -12,7 +12,7 @@ import { successfulCache } from './landMask'
 
 const SURFACE = 'surface'
 const COAST = 'surface-coast' // copy of the basemap's water, drawn over land-only layers so the real coastline clips them
-const OPACITY = { grid: 0.72, 'stations-idw': 0.72, image: 0.85 }
+const OPACITY = { grid: 0.92, 'stations-idw': 0.92, image: 0.85 }
 const FRAME_MS = 700 // how long a frame stays up at 1×
 
 const corners = ([w, s, e, n]: Field['bounds']) => [[w, n], [e, n], [e, s], [w, s]] as [[number, number], [number, number], [number, number], [number, number]]

@@ -1,14 +1,10 @@
-import type { ExpressionSpecification, LayerSpecification, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl'
-import type { Lang } from '../i18n'
+import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl'
 
 export const MAP_COLORS = { ocean: '#0b1220', land: '#334155', line: '#94a3b8', label: '#cbd5e1' }
 export const REFERENCE_LAYER = 'weather-main-roads'
-// The reader's language first, then whatever the tile has: a place with no English name still gets a label.
-const NAMES: Record<Lang, string[]> = {
-  'zh-Hant': ['name:zh-Hant', 'name:zh', 'name:nonlatin', 'name', 'name:en', 'name_en'],
-  en: ['name:en', 'name_en', 'name:latin', 'name', 'name:nonlatin'],
-}
-export const placeName = (lang: Lang): ExpressionSpecification => NAMES[lang].reduceRight<ExpressionSpecification>((fallback, key) =>
+// Traditional Chinese first, then whatever the tile has: a place with no Chinese name still gets a label.
+const NAMES = ['name:zh-Hant', 'name:zh', 'name:nonlatin', 'name', 'name:en', 'name_en']
+export const placeName: ExpressionSpecification = NAMES.reduceRight<ExpressionSpecification>((fallback, key) =>
   ['case', ['all', ['has', key], ['!=', ['get', key], ''], ['!=', ['get', key], null]], ['to-string', ['get', key]], fallback], ['literal', ''])
 const places: Record<string, [number, number, number]> = {
   place_city_large: [5, 24, 14], place_city: [6, 24, 12], place_town: [10, 24, 11],
@@ -17,7 +13,7 @@ const places: Record<string, [number, number, number]> = {
 }
 
 /** An allowlist prevents new provider detail layers from silently adding clutter. */
-export function weatherBasemap(style: StyleSpecification, lang: Lang): StyleSpecification {
+export function weatherBasemap(style: StyleSpecification): StyleSpecification {
   const base = style.layers.filter((l) => l.id === 'background' || l.id === 'water').map((l): LayerSpecification => {
     if (l.type === 'background') return { ...l, paint: { 'background-color': MAP_COLORS.land } }
     if (l.type === 'fill') return { ...l, paint: { 'fill-color': MAP_COLORS.ocean, 'fill-antialias': true } }
@@ -35,15 +31,10 @@ export function weatherBasemap(style: StyleSpecification, lang: Lang): StyleSpec
     if (l.type !== 'symbol') return l
     const [minzoom, maxzoom, size] = places[l.id]
     return { ...l, minzoom, maxzoom,
-      layout: { 'text-field': placeName(lang), 'text-font': ['Noto Sans Regular'], 'text-size': size,
+      layout: { 'text-field': placeName, 'text-font': ['Noto Sans Regular'], 'text-size': size,
         'text-anchor': 'center', 'text-justify': 'center', 'text-padding': 8, 'text-max-width': 12 },
       paint: { 'text-color': MAP_COLORS.label, 'text-halo-color': MAP_COLORS.ocean, 'text-halo-width': 1.5 },
     }
   })
   return { ...style, layers: [...base, roads, ...boundaries, ...labels] }
-}
-
-/** Relabels a map that is already on screen, for switching language without reloading the style. */
-export function setPlaceLanguage(map: MapLibreMap, lang: Lang) {
-  for (const id in places) if (map.getLayer(id)) map.setLayoutProperty(id, 'text-field', placeName(lang))
 }
