@@ -5,6 +5,7 @@ import type { z } from 'zod'
 import { fetchDatastore } from '../cwa/client.js'
 import { COUNTY_FORECASTS, ELEMENTS, normalizeForecast } from '../cwa/forecast.js'
 import { normalizeTyphoons, TYPHOON_DATASET } from '../cwa/typhoon.js'
+import { normalizeWarnings, WARNING_DATASETS } from '../cwa/warnings.js'
 import { db } from '../db/client.js'
 import { publicUrl } from '../lib/storage.js'
 import { stationObservations as obs, stations, weatherFrames } from '../db/schema.js'
@@ -92,6 +93,13 @@ export const publicRoutes = new Hono()
   .get('/typhoons', async (c) => {
     c.header('Cache-Control', cache(600))
     return c.json({ cyclones: normalizeTyphoons(await fetchDatastore(TYPHOON_DATASET, {}, 10_000)) })
+  })
+
+  // The county advisories in force (大雨, 豪雨, 陸上強風, 低溫…) with CWA's own text, live; nothing stored.
+  .get('/warnings', async (c) => {
+    const [counties, texts] = await Promise.all([fetchDatastore(WARNING_DATASETS.counties, {}, 10_000), fetchDatastore(WARNING_DATASETS.texts, {}, 10_000)])
+    c.header('Cache-Control', cache(300))
+    return c.json({ warnings: normalizeWarnings(counties, texts) })
   })
 
   // The timeline's one contract: every layer answers "which instants do you have?" in the same shape.

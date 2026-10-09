@@ -7,7 +7,7 @@ export default function Typhoons() {
   const cyclones = useStore((s) => s.typhoons)
   if (!cyclones.length) return null
   return (
-    <section aria-label={t('typhoon.title')} className="weather-panel pointer-events-auto mt-2 shrink-0 p-1 text-sm desk:w-44">
+    <section aria-label={t('typhoon.title')} className="weather-panel pointer-events-auto shrink-0 p-1 text-sm">
       <div className="ui-muted px-2 pt-1 text-[13px]">{t('typhoon.title')} · {t('typhoon.hint')}</div>
       {cyclones.map((c, i) => {
         const now = c.analysis.at(-1)

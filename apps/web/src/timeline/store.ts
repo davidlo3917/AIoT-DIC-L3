@@ -1,18 +1,18 @@
 import { useSyncExternalStore } from 'react'
-import type { Cyclone, Frame } from '../api'
+import type { Cyclone, Frame, Warning } from '../api'
 import { invalidateObservations } from '../api'
 import { LAYERS, type LayerId } from '../layers'
 
 type LoadState = 'loading' | 'ready' | 'empty' | 'error'
 type State = { layer: LayerId; showStations: boolean; frames: Frame[]; index: number; playing: boolean; speed: number;
   selectedStation: number | null; followLatest: boolean; loadState: LoadState; refreshKey: number; cursorTime: string | null
-  typhoons: Cyclone[]; typhoonFocus: { index: number; seq: number } | null } // seq: the same name tapped twice flies there twice
+  typhoons: Cyclone[]; typhoonFocus: { index: number; seq: number } | null; warnings: Warning[] } // seq: the same name tapped twice flies there twice
 export const currentFrame = (s: State): Frame | undefined => s.frames[s.index]
 
 /** Independent instances make out-of-order requests and playback testable without a browser. */
 export function createTimelineStore() {
   let state: State = { layer: 'temperature', showStations: true, frames: [], index: -1, playing: false, speed: 1,
-    selectedStation: null, followLatest: true, loadState: 'loading', refreshKey: 0, cursorTime: null, typhoons: [], typhoonFocus: null }
+    selectedStation: null, followLatest: true, loadState: 'loading', refreshKey: 0, cursorTime: null, typhoons: [], typhoonFocus: null, warnings: [] }
   let request = 0
   const listeners = new Set<() => void>()
   const set = (patch: Partial<State>) => { state = { ...state, ...patch }; listeners.forEach((l) => l()) }
@@ -25,6 +25,7 @@ export function createTimelineStore() {
     toggleStations() { set({ showStations: !state.showStations, selectedStation: null }) },
     selectStation(selectedStation: number | null) { set({ selectedStation }) },
     setTyphoons(typhoons: Cyclone[]) { set({ typhoons }) },
+    setWarnings(warnings: Warning[]) { set({ warnings }) },
     focusTyphoon(index: number) { set({ typhoonFocus: { index, seq: (state.typhoonFocus?.seq ?? 0) + 1 } }) },
     beginLoad(layer: LayerId) {
       const token = ++request

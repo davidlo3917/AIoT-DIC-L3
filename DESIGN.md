@@ -92,9 +92,9 @@ Station data:
 
 The three station datasets overlap (2,581 records, 1,365–1,367 unique stations); later datasets win on metadata. CWA publishes observations about 15 minutes late, and the radar picture 8–10 minutes after its frame time.
 
-Typhoons (`W-C0034-005`, every active tropical cyclone with CWA's past fixes, wind radii and forecast positions) are not a layer but an overlay drawn over whichever layer is up, proxied live like the forecast (§7, §13).
+Two overlays are drawn over whichever layer is up, both proxied live like the forecast (§7, §13): typhoons (`W-C0034-005`, every active tropical cyclone with CWA's past fixes, wind radii and forecast positions) and county advisories (`W-C0033-001` per county, `W-C0033-002` for the text: 大雨, 豪雨, 陸上強風, 低溫, 濃霧…). The county outlines for the advisories are a static file, `apps/web/public/counties.json`: the 22 counties from taiwan-atlas (MIT, Ministry of the Interior boundaries), arcs simplified to 0.001° and named as CWA names them (臺, not 台), 154 KB.
 
-Not built: wind, lightning, warnings (§20).
+Not built: wind, lightning (§20).
 
 ---
 
@@ -160,14 +160,15 @@ Deliberately absent: Turborepo, a `packages/` layer, Python/GRIB tooling, a clie
 ├── api/index.ts                 Vercel function entry: re-exports the Hono handler
 ├── apps/
 │   ├── web/                     React + MapLibre frontend
+│   │   ├── public/counties.json the 22 county outlines for the advisories (taiwan-atlas, MIT)
 │   │   └── src/
 │   │       ├── api.ts           typed fetchers for /api, 7-day window, observation cache
 │   │       ├── layers.ts        the five layers: frames source, cadence, loop, kind, legend
 │   │       ├── ramps.ts         colour ramps and MapLibre colour expressions
 │   │       ├── i18n.ts          every string, Taiwan-time formatters
 │   │       ├── status.ts        the status line's messages and actions
-│   │       ├── components/      LayerPanel, Legend, StationCard, Sparkline, chartData
-│   │       ├── map/             MapView, basemap filter, useWeather (surface + stations + playback)
+│   │       ├── components/      LayerPanel, Legend, Warnings, Typhoons, StationCard, Sparkline, chartData
+│   │       ├── map/             MapView, basemap filter, useWeather (surface + stations + overlays + playback)
 │   │       │   └── layers/      grid decode/paint, IDW, station dots + zoom thinning
 │   │       └── timeline/        Timeline UI, store, keyboard shortcuts
 │   └── api/                     Hono API
@@ -203,6 +204,7 @@ All public routes are read-only `GET`s under `/api`, JSON, and every response ca
 | `GET /api/stations/:cwaId/history?from=&to=` | one station's observations in the range (default last 24 h, max 8 days) | 60 s |
 | `GET /api/observations?at=` | every station's reading at one instant: per field, the newest non-null value in the 100 min before `at` (stations report at different cadences) | 60 s |
 | `GET /api/forecast?county=&town=` | a township's 12-hourly periods for the coming week; proxied live from CWA, nothing stored; only townships that have a station are accepted | 30 min |
+| `GET /api/warnings` | the county advisories in force: phenomenon, period, the counties under it and CWA's text; proxied live, nothing stored | 5 min |
 | `GET /api/typhoons` | every active tropical cyclone: past fixes, the current one with 15/25 m/s wind radii, forecast fixes with the 70 % probability radius; proxied live from CWA, nothing stored | 10 min |
 | `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `satellite`, `rain-grid` or `temperature-grid` | 60 s |
 
@@ -347,6 +349,8 @@ layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 
 
 **Typhoons.** One GeoJSON source holds, per cyclone, the past track (solid), the forecast track (dashed), the fixes as dots (the current one orange and named, forecast ones labelled with their time), the 15 and 25 m/s wind radii at the current fix and the 70 % probability circles ahead; circles are 48-point rings on an equirectangular approximation. It sits above the weather and the coast clip (a track crosses the sea) and below the stations. The list is refetched every 10 minutes on its own clock. Storms are usually far off-screen, so a chip under the layer list names each one; tapping it fits the track into the part of the screen the panels leave free, or centres the storm where the whole track cannot fit. The map's bounds were widened to CWA's basin (100–180°E, 0–50°N) for this.
 
+**Advisories.** The counties under an advisory are painted from the static county file with a firm 2.5 px outline and a 15 % tint in the advisory's colour (CWA's own language where it has one: rain advisories run blue → orange → red → purple with severity, strong wind yellow, low temperature light blue, fog grey); a county under two advisories takes the more severe colour. The layer sits between the coast clip and the typhoons. The list is refetched every 5 minutes; the county file is fetched the first time there is something to paint. A chip names each advisory with its county count and end time, and opens to the county list and CWA's text. The advisory and typhoon chips form one scrolling group: top-right on roomy screens (hidden while a station card is open, which needs the column's full height at 1280×800), under the layer row on phones, and not at all on a phone on its side, where the outlines on the map have to do.
+
 **Preloading.** Two frames ahead are fetched and decoded during playback so the network is not in the loop.
 
 ---
@@ -458,7 +462,7 @@ Facts worth knowing:
 | Feature | Status | Shape of the work |
 |---|---|---|
 | Wind particles | not started | CWA WRF GRIB2 → GitHub Actions + Python (ecCodes/cfgrib) → U/V field files in Storage → WebGL particle layer; the frames contract already fits |
-| Lightning, warnings | not started | lightning: KMZ ingestion into a table (the placemark format is unseen until a strike happens) + point layer on the station clock; warnings: `W-C0033-001` per-county proxy + county polygons (a static asset) + a list; the tables once designed for them were dropped on 2026-10-09 so the schema matches what runs |
+| Lightning | not started | `O-A0039-001` KMZ (the past hour's strikes, every 10 min) → a table or per-frame files + a point overlay on the station clock; the placemark format is unseen until a strike happens, and the table once designed for it was dropped on 2026-10-09 so the schema matches what runs |
 
 ---
 
@@ -473,6 +477,7 @@ Facts worth knowing:
 - **2026-10-09** Chinese-only UI; stations on by default and thinned by zoom; label and card flicker fixed with keep-until-replaced; township forecast added as a live proxy; 7-day playback; four speculative tables and unused API fields removed; security headers, dependency overrides and CI pins added; this document rewritten as-built.
 - **2026-10-09** Satellite layer shipped: the radar ingest became a list of picture products (format, signature and JSON shape per product), and the legend learned to show a picture layer that has no scale.
 - **2026-10-09** Typhoon tracks shipped as a live proxy plus an overlay, not a layer with history: CWA's document already carries the past track, so storing versions would only pay off for a "forecast vs. actual" feature nobody asked for.
+- **2026-10-09** County advisories shipped the same way. County polygons come from taiwan-atlas rather than g0v's twgeojson (2010 names, 766 split geometries) and are simplified on the TopoJSON arcs, so shared borders stay shared and neighbouring counties never show slivers.
 
 ---
 

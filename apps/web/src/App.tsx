@@ -4,11 +4,17 @@ import LayerPanel, { StationsToggle } from './components/LayerPanel'
 import Legend from './components/Legend'
 import StationCard from './components/StationCard'
 import Typhoons from './components/Typhoons'
+import Warnings from './components/Warnings'
 import { t } from './i18n'
 import MapView from './map/MapView'
 import { STATUS, type Status } from './status'
 import Timeline from './timeline/Timeline'
 import { useStore } from './timeline/store'
+
+/** What is in force right now (advisories, typhoons): nothing when there is nothing. The group scrolls; the panels keep their size. */
+const Alerts = ({ className }: { className: string }) => (
+  <div className={`${className} pointer-events-auto min-h-0 flex-col gap-2 overflow-y-auto`}><Warnings /><Typhoons /></div>
+)
 
 export default function App() {
   const [status, setStatus] = useState<Status>(null)
@@ -37,13 +43,19 @@ export default function App() {
         {/* The one region that gives: its panels shrink and scroll, so the legend and timeline below never leave the screen. */}
         <div className="flex min-h-0 flex-1 flex-col gap-2 sm:flex-row">
           {/* pr-14 keeps the phone's layer row clear of the map controls. On roomy screens the legend sits under the
-              layer list, so the station card on the other side can reach down to the timeline. */}
-          <div className="flex min-h-0 min-w-0 shrink-0 flex-col pr-14 sm:pr-0">
+              layer list, so the station card on the other side can reach down to the timeline. The alerts go under
+              the layer row on compact screens and top-right, above the station card, on roomy ones. */}
+          <div className="flex min-h-0 min-w-0 flex-col gap-2 pr-14 sm:pr-0 desk:shrink-0">
             <LayerPanel />
-            <Typhoons />
-            <div className="mt-auto hidden pt-2 desk:block"><Legend /></div>
+            {/* A phone on its side has no room for them under the layer row; the outlines on the map still show. */}
+            <Alerts className="flex sm:max-w-sm desk:hidden [@media(max-height:399px)]:hidden" />
+            <div className="mt-auto hidden desk:block"><Legend /></div>
           </div>
-          <div className="mt-auto flex min-h-0 min-w-0 flex-col sm:mr-16 sm:mt-0 sm:ml-auto"><StationCard key={selectedStation} stations={stations} /></div>
+          <div className="mt-auto flex min-h-0 min-w-0 flex-col gap-2 sm:mr-16 sm:mt-0 sm:ml-auto">
+            {/* An open station card has the column: the card needs its full height at 1280×800, and the outlines stay on the map. */}
+            <Alerts className={`${selectedStation !== null ? 'hidden' : 'hidden desk:flex'} desk:w-72 desk:self-end`} />
+            <div className="mt-auto flex min-h-0 flex-col"><StationCard key={selectedStation} stations={stations} /></div>
+          </div>
         </div>
         {/* Compact layouts only; it makes way for an open station card. */}
         <div className={`${selectedStation !== null ? 'hidden' : 'flex'} flex-row-reverse items-end justify-between gap-2 sm:flex-row sm:justify-start desk:hidden`}>

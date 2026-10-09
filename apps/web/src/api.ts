@@ -44,5 +44,8 @@ export type Fix = { time: string; lon: number; lat: number; wind: number | null;
   speed: number | null; direction: string | null; r15: number | null; r25: number | null; r70: number | null }
 export type Cyclone = { name: string | null; cwaName: string | null; number: string | null; td: string | null; analysis: Fix[]; forecast: Fix[] }
 export const getTyphoons = (signal?: AbortSignal) => get<{ cyclones: Cyclone[] }>('/typhoons', signal).then((r) => r.cyclones)
+// Shapes mirror apps/api/src/cwa/warnings.ts.
+export type Warning = { phenomena: string; significance: string; start: string; end: string; counties: string[]; text: string | null }
+export const getWarnings = (signal?: AbortSignal) => get<{ warnings: Warning[] }>('/warnings', signal).then((r) => r.warnings)
 /** The station's whole playback window, fetched once per card: the chart then follows the map time without refetching. */
 export const getHistory = (cwaId: string, signal?: AbortSignal) => get<{ observations: (Readings & { observedAt: string })[] }>(`/stations/${cwaId}/history?from=${since()}`, signal).then((r) => r.observations)

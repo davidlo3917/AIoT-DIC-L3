@@ -1,6 +1,6 @@
 import type { CanvasSource, Map as MapLibreMap } from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
-import { getFrames, getObservations, getTyphoons, type Frame, type Station } from '../api'
+import { getFrames, getObservations, getTyphoons, getWarnings, type Frame, type Station } from '../api'
 import { LAYERS } from '../layers'
 import { STATUS, type Status } from '../status'
 import { actions, currentFrame, useStore } from '../timeline/store'
@@ -8,6 +8,7 @@ import { loadField, loadImage, paint, type Field } from './layers/grid'
 import { idw } from './layers/idw'
 import { addStationLayers, updateStations, setStationsVisible } from './layers/stations'
 import { addTyphoonLayers, cycloneBounds, updateTyphoons } from './layers/typhoon'
+import { addWarningLayers, updateWarnings, type Counties } from './layers/warnings'
 import { REFERENCE_LAYER } from './basemap'
 
 const SURFACE = 'surface'
@@ -48,7 +49,8 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     map.addLayer({ id: SURFACE, type: 'raster', source: SURFACE, paint: { 'raster-opacity': 0, 'raster-opacity-transition': { duration: 0, delay: 0 }, 'raster-fade-duration': 0, 'raster-resampling': 'linear' } }, firstLabel)
     const water = map.getStyle().layers.find((l) => l.id === 'water')
     if (water?.type === 'fill') map.addLayer({ ...water, id: COAST, paint: { 'fill-color': map.getPaintProperty('water', 'fill-color') as string } }, firstLabel)
-    const removeTyphoons = addTyphoonLayers(map) // over the weather and the coast clip (a track crosses the sea), under the stations
+    const removeWarnings = addWarningLayers(map) // over the weather and the coast clip (澎湖 is mostly sea), under the typhoons and stations
+    const removeTyphoons = addTyphoonLayers(map) // a track crosses the sea too
     const removeStations = addStationLayers(map, actions.selectStation)
     return () => {
       cancelAnimationFrame(surface.raf)
@@ -57,6 +59,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
       ;(map.getSource(SURFACE) as CanvasSource | undefined)?.pause()
       removeStations()
       removeTyphoons()
+      removeWarnings()
       for (const id of [COAST, SURFACE]) if (map.getLayer(id)) map.removeLayer(id)
       if (map.getSource(SURFACE)) map.removeSource(SURFACE)
     }
@@ -245,6 +248,26 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     if (camera && camera.zoom! >= map.getMinZoom()) map.flyTo(camera)
     else if (now) map.flyTo({ center: [now.lon, now.lat], zoom: map.getMinZoom(), padding })
   }, [map, typhoonFocus]) // not `typhoons`: a refreshed list must not fly the viewer back
+
+  // County advisories, same pattern. The county outlines (a static 22-polygon file) are fetched the first time there is
+  // something to paint, and forgotten on failure so the next advisory tries again.
+  const warnings = useStore((s) => s.warnings)
+  const counties = useRef<Promise<Counties> | null>(null)
+  useEffect(() => {
+    const ac = new AbortController()
+    const load = () => getWarnings(ac.signal).then(actions.setWarnings, () => {})
+    load()
+    const timer = setInterval(load, 5 * 60e3)
+    return () => { ac.abort(); clearInterval(timer) }
+  }, [refreshKey])
+  useEffect(() => {
+    if (!map) return
+    if (!warnings.length) return updateWarnings(map, null, [])
+    let alive = true
+    counties.current ??= fetch('/counties.json').then((r) => r.ok ? r.json() : Promise.reject(new Error(`counties: ${r.status}`)))
+    counties.current.then((c) => { if (alive) updateWarnings(map, c, warnings) }, () => { counties.current = null })
+    return () => { alive = false }
+  }, [map, warnings])
 
   // Warm the caches two frames ahead so playback doesn't stutter on the network.
   const frames = useStore((s) => s.frames), index = useStore((s) => s.index)
