@@ -61,7 +61,7 @@ export default function Timeline({ status }: { status: Status }) {
   const btn = 'ui-button grid h-11 w-11 place-items-center'
   const at = (time: string) => new Date(time)
   return (
-    <section aria-label={t('timeline.label')} className="weather-panel pointer-events-auto px-3 py-2">
+    <section aria-label={t('timeline.label')} data-pad="timeline" className="weather-panel pointer-events-auto px-3 py-2">
       <div className="flex flex-wrap items-center gap-1">
         <button type="button" className={btn} onClick={() => actions.step(-1)} disabled={index <= 0} aria-label={t('timeline.prev')} title={`${t('timeline.prev')} (←)`} aria-keyshortcuts="ArrowLeft"><Icon d={ICONS.prev} /></button>
         <button type="button" className={`${btn} ui-active`} onClick={actions.toggle} disabled={last < 1} aria-label={t(playing ? 'timeline.pause' : 'timeline.play')}

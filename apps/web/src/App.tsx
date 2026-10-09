@@ -13,7 +13,7 @@ import { useStore } from './timeline/store'
 
 /** What is in force right now (advisories, typhoons): nothing when there is nothing. The group scrolls; the panels keep their size. */
 const Alerts = ({ className }: { className: string }) => (
-  <div className={`${className} pointer-events-auto min-h-0 flex-col gap-2 overflow-y-auto`}><Warnings /><Typhoons /></div>
+  <div data-pad="alerts" className={`${className} pointer-events-auto min-h-0 flex-col gap-2 overflow-y-auto`}><Warnings /><Typhoons /></div>
 )
 
 export default function App() {
@@ -58,7 +58,7 @@ export default function App() {
           </div>
         </div>
         {/* Compact layouts only; it makes way for an open station card. */}
-        <div className={`${selectedStation !== null ? 'hidden' : 'flex'} flex-row-reverse items-end justify-between gap-2 sm:flex-row sm:justify-start desk:hidden`}>
+        <div data-pad="legend" className={`${selectedStation !== null ? 'hidden' : 'flex'} flex-row-reverse items-end justify-between gap-2 sm:flex-row sm:justify-start desk:hidden`}>
           <Legend />
           <div className="weather-panel pointer-events-auto desk:hidden"><StationsToggle className="flex" /></div>
         </div>

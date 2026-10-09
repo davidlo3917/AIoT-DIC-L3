@@ -16,7 +16,7 @@ export function StationsToggle({ className }: { className: string }) {
 export default function LayerPanel() {
   const layer = useStore((s) => s.layer)
   return (
-    <nav aria-label={t('layers.label')} className="weather-panel pointer-events-auto flex shrink-0 gap-1 overflow-x-auto p-1 desk:w-44 desk:shrink desk:flex-col desk:overflow-y-auto">
+    <nav aria-label={t('layers.label')} data-pad="layers" className="weather-panel pointer-events-auto flex shrink-0 gap-1 overflow-x-auto p-1 desk:w-44 desk:shrink desk:flex-col desk:overflow-y-auto">
       {(Object.keys(LAYERS) as LayerId[]).map((id) => (
         <button key={id} type="button" aria-pressed={layer === id} onClick={() => actions.setLayer(id)} title={t(`layer.${id}.hint`)}
           // Compact row: five buttons share a phone's width (tight enough for 360 px), and the active one

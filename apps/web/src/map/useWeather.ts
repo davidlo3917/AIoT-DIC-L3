@@ -20,13 +20,24 @@ const corners = ([w, s, e, n]: Field['bounds']) => [[w, n], [e, n], [e, s], [w, 
 const scratch = () => Object.assign(document.createElement('canvas'), { width: 2, height: 2 })
 
 /**
- * Fly to `bounds` keeping them out from under the panels: the sidebar and the alerts top-right on roomy screens, the
- * layer row and alerts above and the legend and timeline below on compact ones. Where the bounds cannot fit (a phone,
- * or one on its side), the map centres `fallback` in the free part of the screen instead.
+ * The part of the screen the panels leave free, measured from the panels themselves (`data-pad` marks them): the
+ * sidebar and the alerts top-right on roomy screens, the layer row and alerts above and the legend and timeline
+ * below on compact ones. A guess would be wrong as soon as an advisory is opened and the alerts grow.
  */
+function panelPadding() {
+  const gap = 12, W = window.innerWidth, H = window.innerHeight
+  const rect = (name: string) => [...document.querySelectorAll<HTMLElement>(`[data-pad="${name}"]`)].find((el) => el.offsetParent)?.getBoundingClientRect()
+  const layers = rect('layers'), alerts = rect('alerts'), legend = rect('legend'), timeline = rect('timeline')
+  const bottom = H - Math.min(legend?.top ?? H, timeline?.top ?? H) + gap
+  if (window.matchMedia('(min-width: 640px) and (min-height: 640px)').matches) {
+    return { left: (layers?.right ?? 0) + gap, top: gap + 48, right: (alerts ? W - alerts.left : 48) + gap, bottom }
+  }
+  return { left: gap, top: Math.max(layers?.bottom ?? 0, alerts?.bottom ?? 0) + gap, right: gap, bottom }
+}
+
+/** Fly to `bounds` in the free part of the screen; where they cannot fit (a phone, or one on its side), centre `fallback` there instead. */
 function flyToBounds(map: MapLibreMap, bounds: [number, number, number, number], fallback: [number, number] | undefined) {
-  const desk = window.matchMedia('(min-width: 640px) and (min-height: 640px)').matches
-  const padding = desk ? { left: 330, top: 40, right: 340, bottom: 230 } : { left: 24, top: 270, right: 24, bottom: 300 }
+  const padding = panelPadding()
   const camera = map.cameraForBounds(bounds, { padding, maxZoom: 7 })
   if (camera && camera.zoom! >= map.getMinZoom()) map.flyTo(camera)
   else if (fallback) map.flyTo({ center: fallback, zoom: map.getMinZoom(), padding })
@@ -262,8 +273,9 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     if (playing && (lng < w || lng > e || lat < s || lat > n)) map.flyTo({ center: HOME.center, zoom: HOME.zoom })
   }, [map, playing])
 
-  // County advisories, same pattern. The county outlines (a static 22-polygon file) are fetched the first time there is
-  // something to paint, and forgotten on failure so the next advisory tries again.
+  // County advisories, same pattern. The map draws only the advisory the viewer opened in the panel; the county
+  // outlines (a static 22-polygon file) are fetched the first time one is opened, and forgotten on failure so the next
+  // try fetches again.
   const warnings = useStore((s) => s.warnings), warningFocus = useStore((s) => s.warningFocus)
   const counties = useRef<Promise<Counties> | null>(null)
   useEffect(() => {
@@ -275,7 +287,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   }, [refreshKey])
   useEffect(() => {
     if (!map) return
-    if (!warnings.length) return updateWarnings(map, null, [])
+    if (warningFocus == null) return updateWarnings(map, null, [], null)
     let alive = true
     counties.current ??= fetch('/counties.json').then((r) => r.ok ? r.json() : Promise.reject(new Error(`counties: ${r.status}`)))
     counties.current.then((c) => { if (alive) updateWarnings(map, c, warnings, warningFocus) }, () => { counties.current = null })
