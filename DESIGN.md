@@ -1,6 +1,6 @@
 # Taiwan Weather Map — System Design (as built)
 
-This document describes the system as it runs today, not as it was first planned. The original plan (September 2026) listed wind particles, satellite, lightning, typhoon tracks and warnings; what shipped is the subset in §3, and the rest is listed in §20 with what it would take. Where a decision changed along the way, §21 says why.
+This document describes the system as it runs today, not as it was first planned. The original plan (September 2026) listed wind particles, satellite, lightning, typhoon tracks and warnings; all but lightning shipped (§3), and §20 records what was dropped and why. Where a decision changed along the way, §21 says why.
 
 Live: <https://a-io-t-dic-l3.vercel.app> · Source: `davidlo3917/AIoT-DIC-L3` on GitHub · User guide (zh-TW): `README.md`
 
@@ -97,8 +97,6 @@ Station data:
 The three station datasets overlap (2,581 records, 1,365–1,367 unique stations); later datasets win on metadata. CWA publishes observations about 15 minutes late, and the radar picture 8–10 minutes after its frame time.
 
 Two overlays are drawn over whichever layer is up, both proxied live like the forecast (§7, §13): typhoons (`W-C0034-005`, every active tropical cyclone with CWA's past fixes, wind radii and forecast positions) and county advisories (`W-C0033-001` per county, `W-C0033-002` for the text: 大雨, 豪雨, 陸上強風, 低溫, 濃霧…). The county outlines for the advisories are a static file, `apps/web/public/counties.json`: the 22 counties from taiwan-atlas (MIT, Ministry of the Interior boundaries), arcs simplified to 0.001° and named as CWA names them (臺, not 台), 154 KB.
-
-Not built: lightning (§20).
 
 ---
 
@@ -207,11 +205,11 @@ All public routes are read-only `GET`s under `/api`, JSON, and every response ca
 | `GET /api/health` | `{ ok, db }` — database reachable? | none |
 | `GET /api/stations` | all stations: id, CWA id, name, county, town, WGS84 position, elevation | 1 h |
 | `GET /api/stations/:cwaId/history?from=&to=` | one station's observations in the range (default last 24 h, max 12 days; instants snapped to whole hours) | 60 s |
-| `GET /api/observations?at=` | every station's reading at one instant: per field, the newest non-null value in the 100 min before `at` (stations report at different cadences) | 60 s |
+| `GET /api/observations?at=` | every station's reading at one instant (`at` snapped down to the 10-minute grid): per field, the newest non-null value in the 100 min before it (stations report at different cadences) | 60 s |
 | `GET /api/forecast?county=&town=` | a township's 12-hourly periods for the coming week; proxied live from CWA, nothing stored; only townships that have a station are accepted | 30 min |
 | `GET /api/warnings` | the county advisories in force: phenomenon, period, the counties under it and CWA's text; proxied live, nothing stored | 5 min |
 | `GET /api/typhoons` | every active tropical cyclone: past fixes, the current one with 15/25 m/s wind radii, forecast fixes with the 70 % probability radius; proxied live from CWA, nothing stored | 10 min |
-| `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `satellite`, `rain-grid`, `temperature-grid` or `wind`; a range of up to 12 days | 60 s |
+| `GET /api/frames?layer=&from=&to=` | the timeline contract: `[{ time, url?, bounds?, meta? }]` for `stations`, `radar`, `satellite`, `rain-grid`, `temperature-grid` or `wind`; a range of up to 12 days, widened to whole hours | 60 s |
 
 The **frames contract** is the one shape every layer answers in. Station frames are a synthetic 10-minute grid clipped to what is stored (no URL: the browser asks `/observations` per frame). Grid and picture frames carry the Storage URL and the WGS84 bounds; encoded grids also carry their decoding recipe in `meta`. Wind frames are the same shape with times that run past now (the browser asks for `to` = now + 4 days for that layer only) and a `meta` that also names the model run.
 
@@ -477,11 +475,11 @@ Facts worth knowing:
 
 ---
 
-## 20. Not Built, and What It Would Take
+## 20. Dropped from the Plan
 
-| Feature | Status | Shape of the work |
+| Feature | Status | Why |
 |---|---|---|
-| Lightning | not started | `O-A0039-001` KMZ (the past hour's strikes, every 10 min) → a table or per-frame files + a point overlay on the station clock; the placemark format is unseen until a strike happens, and the table once designed for it was dropped on 2026-10-09 so the schema matches what runs |
+| Lightning | dropped 2026-10-09 | `O-A0039-001` is a KMZ of the past hour's strikes; every file fetched during the day held none, so the placemark format was never seen and nothing could be built against it. The project is complete without it |
 | Forecast history (forecast vs. actual) | dropped 2026-10-09 | `forecast_runs` / `forecast_values` were designed for it and removed unused; the township forecast and typhoons are live proxies that keep no versions (§21). Nobody asked to score CWA's forecasts, so there is nothing to build until someone does |
 
 ---
@@ -499,6 +497,7 @@ Facts worth knowing:
 - **2026-10-09** Typhoon tracks shipped as a live proxy plus an overlay, not a layer with history: CWA's document already carries the past track, so storing versions would only pay off for a "forecast vs. actual" feature nobody asked for.
 - **2026-10-09** County advisories shipped the same way. County polygons come from taiwan-atlas rather than g0v's twgeojson (2010 names, 766 split geometries) and are simplified on the TopoJSON arcs, so shared borders stay shared and neighbouring counties never show slivers.
 - **2026-10-09** Wind shipped from the API itself rather than the planned GitHub Actions + ecCodes pipeline: probing the WRF file with range requests showed one Lambert grid, plain 24-bit simple packing and no bitmap, which a 120-line reader handles, so no Python, no Actions and no secrets outside the platform. The timeline gained a forecast: "latest" became the last frame at or before now, and frames may lie ahead of it. Particles went on a 2D canvas instead of WebGL — a few thousand segments a frame need no shader.
+- **2026-10-09** Station dots carry the forecast ahead of now (the field's speed at each anemometer station, drawn inverted) after the user watched them vanish the moment playback entered the forecast; the alternative, a note saying there are no readings, explained the gap without filling it.
 - **2026-10-09** Evening review pass: query instants snapped to the data grid (an unbounded CDN key space was the one load finding of the security review); station labels carry their unit and the station spacing grew to 56 px after measuring one label in eight lost to collisions; a repo-wide audit cut unused fields the typhoon and forecast proxies shipped, duplicated helpers and the pnpm-script layer under the Taskfile.
 - **2026-10-09** Wind timeline made hourly by blending the 6-hourly frames in the browser (what the plan called the shader lerp, done in a loop of 134k cells instead), and the particle canvas moved under the labels by showing it as a canvas source pinned to the view rather than a `CustomLayerInterface`: the source MapLibre already has does the upload and the ordering.
 
