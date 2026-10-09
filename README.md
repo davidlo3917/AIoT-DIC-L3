@@ -31,7 +31,7 @@
 - **時間軸**：每個圖層都能回放過去 7 天。
 - **語言**：介面只有繁體中文。
 
-尚未完成：風場與其他圖層（衛星雲圖等），規劃見 DESIGN.md 第 23 節的 Milestone 6、7。
+尚未完成：風場與其他圖層（衛星雲圖等），見 DESIGN.md 第 20 節。
 
 ## 操作說明
 
@@ -61,7 +61,7 @@
 | 排程 | Supabase Cron（`pg_cron` + `pg_net`），密鑰存放在 Supabase Vault |
 
 ```text
-apps/web/src        前端：地圖（map/）、時間軸（timeline/）、元件（components/）、中英文字典（i18n.ts）
+apps/web/src        前端：地圖（map/）、時間軸（timeline/）、元件（components/）、介面文字（i18n.ts）
 apps/api/src        後端：CWA 介接（cwa/）、資料擷取（ingestion/）、API 路由（routes/）、資料庫（db/）
 apps/api/scripts    維運指令：migration、排程狀態、補資料、清理規則驗證
 supabase/migrations 資料庫 migration（含手寫的排程與清理工作）
@@ -130,11 +130,10 @@ task db:push                       # 套用到 Supabase（會變更正式資料�
 |---|---|
 | `GET /api/health` | 服務與資料庫連線狀態 |
 | `GET /api/stations` | 所有測站（編號、氣象署站號、名稱、縣市、WGS84 座標、海拔） |
-| `GET /api/stations/:cwaId` | 單一測站與其最新讀數 |
 | `GET /api/stations/:cwaId/history?from=&to=` | 該站在指定區間的觀測（預設最近 24 小時，最長 8 天） |
 | `GET /api/observations?at=` | 指定時間點各測站的最新讀數（預設為現在），對應時間軸上的一個位置 |
-| `GET /api/forecast?county=&town=` | 鄉鎮未來一週逐 12 小時預報（天氣、最高／最低溫、降雨機率），即時向氣象署查詢、不存入資料庫，CDN 快取 30 分鐘 |
-| `GET /api/frames?layer=&from=&to=` | 圖層的時間軸影格。`layer` 可為 `stations`、`radar`、`rain-grid`、`temperature-grid`；`satellite`、`wind` 已保留，目前沒有資料 |
+| `GET /api/forecast?county=&town=` | 鄉鎮未來一週逐 12 小時預報（天氣、最高／最低溫、降雨機率），即時向氣象署查詢、不存入資料庫，CDN 快取 30 分鐘。只接受有測站的鄉鎮，其他回傳 404 |
+| `GET /api/frames?layer=&from=&to=` | 圖層的時間軸影格。`layer` 可為 `stations`、`radar`、`rain-grid`、`temperature-grid` |
 
 參數格式不正確時回傳 400 與錯誤說明。
 
@@ -178,13 +177,15 @@ task db:push                       # 套用到 Supabase（會變更正式資料�
 task check   # 等同 CI：pnpm typecheck、pnpm test、pnpm build
 ```
 
-GitHub Actions 在每次 push 與 pull request 執行同一組檢查。
+GitHub Actions 在每次 push 與 pull request 執行同一組檢查（workflow 只有唯讀權限，使用的 action 都釘在 commit SHA）。`pnpm-workspace.yaml` 要求套件發布滿一週才能安裝，並以 `overrides` 排除建置工具中有安全公告的舊版相依套件；`pnpm audit` 目前沒有已知漏洞。
 
 ## 部署
 
 推送到 `main` 就會部署到 Vercel。整個 repo 是一個 Vercel 專案：靜態網站來自 `apps/web/dist`，API 來自 `api/index.ts`。
 
 Vercel 建置時會先執行型別檢查與測試（`pnpm typecheck && pnpm test && pnpm build`），測試失敗就不會部署。新的 migration 不會隨部署自動套用，需另外執行 `task db:push`。
+
+所有回應都帶有 `vercel.json` 設定的安全標頭：Content-Security-Policy（只允許本站、OpenFreeMap 底圖與 Supabase Storage）、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、Referrer-Policy 與 Permissions-Policy。`/api` 另有 Vercel WAF 的每 IP 流量上限。
 
 ## 資料來源
 
