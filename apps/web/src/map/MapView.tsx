@@ -28,6 +28,8 @@ export default function MapView({ stations, onStatus }: { stations: Station[]; o
       zoom: 6.5,
       minZoom: 4,
       maxBounds: [BOUNDS[0] - 10, BOUNDS[1] - 8, BOUNDS[2] + 10, BOUNDS[3] + 8],
+      // A label whose text changes (25.0 → 25.3) counts as a new one, and would fade in from nothing on every frame.
+      fadeDuration: 0,
       attributionControl: false, // added below, top-right: the default bottom corner sits under the timeline
     })
     m.setStyle(STYLE_URL, {

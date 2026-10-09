@@ -199,9 +199,9 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
 
   useEffect(() => {
     if (!map) return
-    setStationsVisible(map, false)
     setStationStatus(null)
-    if (!frame || !showStations) return
+    // The previous frame's stations stay up until this one's replace them: hiding them in between blinks every label.
+    if (!frame || !showStations) return setStationsVisible(map, false)
     let alive = true
     getObservations(frame.time).then((obs) => {
       if (!alive) return
