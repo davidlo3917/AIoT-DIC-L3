@@ -30,8 +30,8 @@ export default function App() {
       <div className="app-chrome pointer-events-none absolute inset-0 flex flex-col gap-2">
         {/* A phone on its side keeps about 300 px under the browser's own bars; the title gives way there. */}
         <header className="flex flex-wrap items-center gap-x-2 pr-14 [@media(max-height:359px)]:hidden">
-          <h1 className="text-base font-semibold tracking-wide drop-shadow">{t('app.title')}</h1>
-          <p className="ui-muted order-last basis-full text-xs sm:order-none sm:basis-auto">{t('app.source')}</p>
+          <h1 className="text-lg font-semibold tracking-wide drop-shadow">{t('app.title')}</h1>
+          <p className="ui-muted order-last basis-full text-sm sm:order-none sm:basis-auto">{t('app.source')}</p>
         </header>
         {/* The one region that gives: its panels shrink and scroll, so the legend and timeline below never leave the screen. */}
         <div className="flex min-h-0 flex-1 flex-col gap-2 sm:flex-row">

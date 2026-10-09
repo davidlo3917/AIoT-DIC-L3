@@ -68,32 +68,32 @@ export default function Timeline({ status }: { status: Status }) {
         <button type="button" className={btn} onClick={() => actions.step(1)} disabled={index >= last} aria-label={t('timeline.next')} title={`${t('timeline.next')} (→)`} aria-keyshortcuts="ArrowRight"><Icon d={ICONS.next} /></button>
         <div className="order-first min-w-0 basis-full pb-1 sm:order-none sm:ml-3 sm:basis-auto sm:flex-1 sm:pb-0">
           <div className="flex items-baseline gap-2">
-            <time className="whitespace-nowrap text-sm font-semibold tabular-nums" dateTime={frame?.time}>
+            <time className="whitespace-nowrap text-base font-semibold tabular-nums" dateTime={frame?.time}>
               {frame ? <><span className="sm:hidden">{dayTime.format(at(frame.time))}</span><span className="hidden sm:inline">{fullTime.format(at(frame.time))}</span></> : '—'}
             </time>
-            <span className="ui-muted text-[11px]">UTC+8</span>
-            {frame && <span className="ui-muted truncate text-[11px]">· {age(Date.parse(frame.time), now)}</span>}
+            <span className="ui-muted text-[13px]">UTC+8</span>
+            {frame && <span className="ui-muted truncate text-[13px]">· {age(Date.parse(frame.time), now)}</span>}
           </div>
         </div>
         {/* One control for "am I seeing now?": lit while following the newest data, the way back otherwise. */}
-        <button type="button" className={`ui-button ml-auto px-3 text-xs ${following && frame ? 'ui-active' : 'bg-slate-800/60'}`} onClick={actions.latest} disabled={!frames.length}
+        <button type="button" className={`ui-button ml-auto px-3 text-sm ${following && frame ? 'ui-active' : 'bg-slate-800/60'}`} onClick={actions.latest} disabled={!frames.length}
           title={t(following ? 'timeline.live.title' : 'timeline.latest.title')}>
           {following ? <><span aria-hidden="true" className={frame ? 'text-emerald-400' : undefined}>● </span>{t('timeline.live')}</> : t('timeline.latest')}
         </button>
-        <label className="ui-muted flex items-center gap-1 text-xs">
+        <label className="ui-muted flex items-center gap-1 text-sm">
           <span className="hidden sm:inline">{t('timeline.speed')}</span>
           <select aria-label={t('timeline.speed.label')} value={speed} onChange={(e) => actions.setSpeed(Number(e.target.value))} className="ui-button bg-slate-800/60 px-2">
             {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
           </select>
         </label>
       </div>
-      {shown && <div className="flex items-center justify-between gap-2 text-xs text-amber-200" role="status">
+      {shown && <div className="flex items-center justify-between gap-2 text-sm text-amber-200" role="status">
         <span>{t(shown.key)}</span>
         {shown.action && <button type="button" className="ui-button shrink-0 px-3 underline" onClick={shown.action.run}>{t(shown.action.key)}</button>}
       </div>}
       <input type="range" min={0} max={Math.max(0, last)} value={Math.max(0, index)} onChange={(e) => actions.seek(Number(e.target.value))} disabled={last < 1}
         aria-label={t('timeline.time')} aria-valuetext={frame ? fullTime.format(at(frame.time)) : undefined} className="block h-11 w-full" />
-      <div className="flex justify-between text-[11px] tabular-nums text-slate-400">
+      <div className="flex justify-between text-[13px] tabular-nums text-slate-400">
         <span>{frames[0] ? weekdayTime.format(at(frames[0].time)) : ''}</span>
         <span className={frames.length > 0 && frames.length <= 5 ? 'px-2 text-center text-amber-300' : undefined}>{history}</span>
         <span>{frames[last] ? weekdayTime.format(at(frames[last].time)) : ''}</span>

@@ -7,9 +7,9 @@ const NAMES = ['name:zh-Hant', 'name:zh', 'name:nonlatin', 'name', 'name:en', 'n
 export const placeName: ExpressionSpecification = NAMES.reduceRight<ExpressionSpecification>((fallback, key) =>
   ['case', ['all', ['has', key], ['!=', ['get', key], ''], ['!=', ['get', key], null]], ['to-string', ['get', key]], fallback], ['literal', ''])
 const places: Record<string, [number, number, number]> = {
-  place_city_large: [5, 24, 14], place_city: [6, 24, 12], place_town: [10, 24, 11],
-  place_state: [6, 9, 11], place_country_other: [0, 6, 12],
-  place_country_minor: [0, 6, 12], place_country_major: [0, 6, 12],
+  place_city_large: [5, 24, 16], place_city: [6, 24, 14], place_town: [10, 24, 13],
+  place_state: [6, 9, 13], place_country_other: [0, 6, 14],
+  place_country_minor: [0, 6, 14], place_country_major: [0, 6, 14],
 }
 
 /** An allowlist prevents new provider detail layers from silently adding clutter. */

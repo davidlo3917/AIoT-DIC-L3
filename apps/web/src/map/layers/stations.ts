@@ -57,7 +57,7 @@ export function addStationLayers(map: MapLibreMap, onSelect: (stationId: number 
   map.addLayer({
     id: LABELS, type: 'symbol', source: SOURCE, filter: ['>=', ['zoom'], ['get', 'minzoom']],
     // Anchored by its bottom edge so the value clears the dot at every size of both.
-    layout: { visibility: 'none', 'text-field': ['get', 'label'], 'text-size': ['interpolate', ['linear'], ['zoom'], 9, 12.5, 12, 15],
+    layout: { visibility: 'none', 'text-field': ['get', 'label'], 'text-size': ['interpolate', ['linear'], ['zoom'], 9, 14.5, 12, 17],
       'text-anchor': 'bottom', 'text-offset': [0, -0.85], 'text-font': ['Noto Sans Regular'] },
     paint: { 'text-color': '#f1f5f9', 'text-halo-color': '#0b1220', 'text-halo-width': 1.6 },
   })
