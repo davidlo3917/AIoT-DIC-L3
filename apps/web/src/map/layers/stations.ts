@@ -4,9 +4,11 @@ import { mapExpression, RAMPS, type Variable } from '../../ramps'
 
 const SOURCE = 'stations', DOTS = 'station-dots', LABELS = 'station-values'
 const FIELD: Record<Variable, keyof Observation> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h', wind: 'windSpeed' }
+/** On the map the unit is a sign after the number: 28.3°, 85%, 12.0 mm, 5.1 m/s (the legend and the card spell it out). */
+export const sign = (unit: string) => unit === '°C' ? '°' : unit === '%' ? '%' : ` ${unit}`
 // Zoomed out, only the most relevant stations are drawn, at least SPACING px apart; each zoom level in adds the next
 // most relevant ones that fit, and from ALL_ZOOM on every station is drawn.
-const FIRST_ZOOM = 5, ALL_ZOOM = 11, SPACING = 44
+const FIRST_ZOOM = 5, ALL_ZOOM = 11, SPACING = 56 // wide enough for "12.3 m/s" at the label size of zoom 9–10, so a drawn dot has its value
 const WORLD = 512 // MapLibre's world size in px at zoom 0
 
 /**
@@ -97,7 +99,7 @@ export function updateStations(map: MapLibreMap, stations: Station[], observatio
   ;(map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData({
     type: 'FeatureCollection',
     features: shown.map(({ s, v }, i) => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [s.longitude, s.latitude] },
-      properties: { id: s.id, value: v, label: ramp.format(v), minzoom: from[i] } })),
+      properties: { id: s.id, value: v, label: ramp.format(v) + sign(ramp.unit), minzoom: from[i] } })),
   })
   map.setPaintProperty(DOTS, 'circle-color', mapExpression(ramp, 'value') as never)
   setStationsVisible(map, true)

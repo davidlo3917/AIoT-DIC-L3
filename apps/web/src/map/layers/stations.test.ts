@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { minZooms } from './stations'
+import { minZooms, sign } from './stations'
+
+test('map labels carry the unit as a sign: tight for degrees and percent, spaced for the rest', () => {
+  assert.deepEqual(['°C', '%', 'mm', 'm/s'].map(sign), ['°', '%', ' mm', ' m/s'])
+})
 
 test('zoomed out keeps the most relevant of close stations, and zooming in only adds', () => {
   // Taipei, a station 2 km away, and Kaohsiung — most relevant first.
