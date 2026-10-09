@@ -1,8 +1,9 @@
-import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
+import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { Observation, Readings, Station } from '../../api'
 import { mapExpression, RAMPS, type Variable } from '../../ramps'
 
 const SOURCE = 'stations', DOTS = 'station-dots', LABELS = 'station-values'
+const STROKE_WIDTH: ExpressionSpecification = ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 2]
 export const FIELD: Record<Variable, keyof Readings> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h', wind: 'windSpeed' }
 /** On the map the unit is a sign after the number: 28.3°, 85%, 12.0 mm, 5.1 m/s (the legend and the card spell it out). */
 export const sign = (unit: string) => unit === '°C' ? '°' : unit === '%' ? '%' : ` ${unit}`
@@ -51,7 +52,7 @@ export function addStationLayers(map: MapLibreMap, onSelect: (stationId: number 
     paint: {
       // Sized to be read and tapped at city scale, where people actually look at single stations.
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 4.5, 10, 7.5, 13, 11],
-      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 2],
+      'circle-stroke-width': STROKE_WIDTH,
       'circle-stroke-color': '#0b1220',
       'circle-color': '#ffffff',
     },
@@ -86,8 +87,12 @@ export function setStationsVisible(map: MapLibreMap, visible: boolean) {
   if (!visible) map.getCanvas().style.cursor = ''
 }
 
-/** Only stations that have a reading for the active variable are drawn — a rain gauge has no temperature to show. */
-export function updateStations(map: MapLibreMap, stations: Station[], observations: Observation[], variable: Variable) {
+/**
+ * Only stations that have a reading for the active variable are drawn — a rain gauge has no temperature to show.
+ * `forecast`: the values are a model's, not readings (the wind layer ahead of now); the dots are drawn inverted, dark
+ * with a light ring, so a forecast never passes for an observation.
+ */
+export function updateStations(map: MapLibreMap, stations: Station[], observations: Observation[], variable: Variable, forecast = false) {
   const ramp = RAMPS[variable], field = FIELD[variable]
   const byId = new Map(observations.map((o) => [o.stationId, o]))
   const shown = stations.flatMap((s) => {
@@ -101,6 +106,8 @@ export function updateStations(map: MapLibreMap, stations: Station[], observatio
     features: shown.map(({ s, v }, i) => ({ type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [s.longitude, s.latitude] },
       properties: { id: s.id, value: v, label: ramp.format(v) + sign(ramp.unit), minzoom: from[i] } })),
   })
-  map.setPaintProperty(DOTS, 'circle-color', mapExpression(ramp, 'value') as never)
+  map.setPaintProperty(DOTS, 'circle-color', forecast ? 'rgba(11,18,32,0.75)' : mapExpression(ramp, 'value') as never)
+  map.setPaintProperty(DOTS, 'circle-stroke-color', forecast ? '#f1f5f9' : '#0b1220')
+  map.setPaintProperty(DOTS, 'circle-stroke-width', forecast ? 1.5 : STROKE_WIDTH)
   setStationsVisible(map, true)
 }

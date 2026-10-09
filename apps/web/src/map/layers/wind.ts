@@ -19,6 +19,12 @@ export function hourly(frames: Frame[]): Frame[] {
   return out
 }
 
+/** The speed at a point: the cell under it, NaN outside the field or over a missing cell. */
+export function speedAt(f: WindField, lon: number, lat: number) {
+  const [w, s, e, n] = f.bounds, col = Math.floor(((lon - w) / (e - w)) * f.width), row = Math.floor(((n - lat) / (n - s)) * f.height)
+  return col < 0 || row < 0 || col >= f.width || row >= f.height ? NaN : f.values[row * f.width + col]
+}
+
 /** The field `t` of the way from `a` to `b`: u and v blended, the speed that of the blended vector; a cell missing in either is missing. */
 export function blend(a: WindField, b: WindField, t: number): WindField {
   const n = a.u.length, u = new Float32Array(n), v = new Float32Array(n), values = new Float32Array(n)

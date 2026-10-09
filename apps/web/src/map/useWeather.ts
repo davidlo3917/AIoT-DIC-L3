@@ -1,13 +1,13 @@
 import type { CanvasSource, Map as MapLibreMap } from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
-import { getFrames, getObservations, getTyphoons, getWarnings, type Frame, type Station } from '../api'
+import { getFrames, getObservations, getTyphoons, getWarnings, type Frame, type Observation, type Station } from '../api'
 import { LAYERS } from '../layers'
 import { STATUS, type Status } from '../status'
-import { actions, currentFrame, useStore } from '../timeline/store'
+import { actions, currentFrame, latestIndex, useStore } from '../timeline/store'
 import { corners, loadField, loadImage, loadWind, paint, type Field, type WindField } from './layers/grid'
 import { idw } from './layers/idw'
 import { startParticles } from './layers/particles'
-import { hourly } from './layers/wind'
+import { hourly, speedAt } from './layers/wind'
 import { addStationLayers, updateStations, setStationsVisible } from './layers/stations'
 import { addTyphoonLayers, cycloneBounds, setTyphoonsVisible, updateTyphoons } from './layers/typhoon'
 import { addWarningLayers, countyBounds, updateWarnings, type Counties } from './layers/warnings'
@@ -249,12 +249,15 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     return () => clearTimeout(timer)
   }, [playing, shown, frame, speed])
 
+  const frames = useStore((s) => s.frames), index = useStore((s) => s.index)
+  const future = !!frame && Date.parse(frame.time) > Date.now()
   useEffect(() => {
     if (!map) return
     setStationStatus(null)
     // The previous frame's stations stay up until this one's replace them: hiding them in between blinks every label.
-    // A forecast frame (wind) lies ahead of now: there are no readings for it, and that is not a problem to report.
-    if (!frame || !showStations || Date.parse(frame.time) > Date.now()) return setStationsVisible(map, false)
+    // A frame ahead of now (the wind forecast) has no readings: the effect below puts the forecast on the dots instead.
+    if (!frame || !showStations || (future && layer.kind !== 'wind')) return setStationsVisible(map, false)
+    if (future) return
     let alive = true
     getObservations(frame.time).then((obs) => {
       if (!alive) return
@@ -266,7 +269,28 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
       setStationStatus(STATUS.stationReadingsFailed)
     })
     return () => { alive = false }
-  }, [map, frame, layer.stations, stations, showStations, refreshKey])
+  }, [map, frame, future, layer.kind, layer.stations, stations, showStations, refreshKey])
+
+  // Ahead of now the dots carry the forecast: the field's speed at each station that reported wind at the newest
+  // observation (so rain gauges stay off the map), drawn inverted (stations.ts) once this frame's field is on the map.
+  useEffect(() => {
+    const field = windField.current
+    if (!map || !frame || !future || !showStations || layer.kind !== 'wind' || shown !== frame) return
+    if (!field) return setStationsVisible(map, false)
+    const newest = frames[latestIndex(frames)]
+    if (!newest) return
+    let alive = true
+    getObservations(newest.time).then((obs) => {
+      if (!alive) return
+      const anemometers = new Set(obs.filter((o) => o.windSpeed != null).map((o) => o.stationId))
+      const forecast = stations.filter((s) => anemometers.has(s.id)).map((s) => {
+        const v = speedAt(field, s.longitude, s.latitude)
+        return { stationId: s.id, windSpeed: Number.isNaN(v) ? null : v } as Observation // ponytail: only windSpeed is read for this variable
+      })
+      updateStations(map, stations, forecast, 'wind', true)
+    }, () => { if (alive) setStationsVisible(map, false) })
+    return () => { alive = false }
+  }, [map, frame, future, shown, showStations, layer.kind, stations, frames, refreshKey])
 
   // Active typhoons: fetched on their own clock (CWA reissues every 3–6 h), drawn whatever layer is up. A failed fetch
   // keeps whatever was drawn; there is no status for it, the chip simply does not appear.
@@ -325,7 +349,6 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   }, [map, warningFocus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Warm the caches two frames ahead so playback doesn't stutter on the network.
-  const frames = useStore((s) => s.frames), index = useStore((s) => s.index)
   useEffect(() => {
     for (const next of frames.slice(index + 1, index + 3)) {
       if ((layer.kind === 'stations-idw' || showStations) && Date.parse(next.time) <= Date.now()) getObservations(next.time).catch(() => {})
