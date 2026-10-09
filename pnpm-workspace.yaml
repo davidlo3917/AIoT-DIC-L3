@@ -3,3 +3,11 @@ packages:
 onlyBuiltDependencies:
   - esbuild
   - supabase
+# Advisories in build-only dependencies (drizzle-kit's esbuild loader, tailwind's source maps): neither ships.
+overrides:
+  esbuild: '>=0.25.0'
+  source-map-js: '>=1.2.2'
+# Supply chain: no package younger than a week, no git/tarball sub-dependencies, no quiet downgrades of provenance.
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+blockExoticSubdeps: true

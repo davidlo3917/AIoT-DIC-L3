@@ -11,11 +11,11 @@ async function cwa(path: string, what: string, ms: number, query = '') {
   return res
 }
 
-/** REST "datastore" datasets (stations, forecasts, warnings, typhoons). Grids/imagery use the file API instead. */
+/** REST "datastore" datasets (stations, forecasts). Grids/imagery use the file API instead. */
 export const fetchDatastore = async (datasetId: string, params: Record<string, string> = {}, ms = 30_000): Promise<unknown> =>
   (await cwa(`/api/v1/rest/datastore/${datasetId}`, datasetId, ms, Object.entries(params).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join(''))).json()
 
-/** File-API datasets (grids, radar, satellite): the endpoint 302s to a JSON document on CWA's public S3. */
+/** File-API datasets (grids, radar): the endpoint 302s to a JSON document on CWA's public S3. */
 export const fetchFileApi = async (datasetId: string): Promise<any> =>
   (await cwa(`/fileapi/v1/opendataapi/${datasetId}`, `file ${datasetId}`, 45_000, '&downloadType=WEB&format=JSON')).json()
 

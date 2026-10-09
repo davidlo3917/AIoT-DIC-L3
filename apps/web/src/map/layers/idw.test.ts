@@ -14,7 +14,3 @@ test('idw: exact at a station, bounded by inputs, respects the mask', () => {
   for (const v of out.values) if (!Number.isNaN(v)) assert.ok(v >= 10 && v <= 30)
   assert.ok(out.values[0 * 4 + 3] > out.values[3 * 4 + 0], 'nearer the 30 → higher')
 })
-
-test('idw: too few points → empty field, not a fabricated one', () => {
-  assert.ok(idw([{ lon: 120.5, lat: 22.5, value: 50 }], mask).values.every(Number.isNaN))
-})

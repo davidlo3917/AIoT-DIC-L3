@@ -1,10 +1,9 @@
-import { useT } from '../i18n'
+import { t } from '../i18n'
 import { LAYERS } from '../layers'
 import { cssGradient, legendPosition } from '../ramps'
 import { useStore } from '../timeline/store'
 
 export default function Legend() {
-  const { t } = useT()
   const layer = useStore((s) => s.layer)
   const ramp = LAYERS[layer].legend, name = t(`layer.${layer}`), hint = t(`layer.${layer}.hint`)
   return (

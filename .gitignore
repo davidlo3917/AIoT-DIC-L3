@@ -7,6 +7,4 @@ dist/
 .task/
 *.tsbuildinfo
 .DS_Store
-__pycache__/
-*.grb2
 supabase/.temp/

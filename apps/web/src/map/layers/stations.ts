@@ -85,7 +85,7 @@ export function setStationsVisible(map: MapLibreMap, visible: boolean) {
 }
 
 /** Only stations that have a reading for the active variable are drawn — a rain gauge has no temperature to show. */
-export function updateStations(map: MapLibreMap, stations: Station[], observations: Observation[], variable: Variable, visible: boolean) {
+export function updateStations(map: MapLibreMap, stations: Station[], observations: Observation[], variable: Variable) {
   const ramp = RAMPS[variable], field = FIELD[variable]
   const byId = new Map(observations.map((o) => [o.stationId, o]))
   const shown = stations.flatMap((s) => {
@@ -100,5 +100,5 @@ export function updateStations(map: MapLibreMap, stations: Station[], observatio
       properties: { id: s.id, value: v, label: ramp.format(v), minzoom: from[i] } })),
   })
   map.setPaintProperty(DOTS, 'circle-color', mapExpression(ramp, 'value') as never)
-  setStationsVisible(map, visible)
+  setStationsVisible(map, true)
 }

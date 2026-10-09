@@ -1,4 +1,4 @@
-export type Shortcut = 'toggle' | 'prev' | 'next' | null
+type Shortcut = 'toggle' | 'prev' | 'next' | null
 type Key = Pick<KeyboardEvent, 'key' | 'repeat' | 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>
 type Target = { tagName: string; type?: string; isContentEditable?: boolean }
 

@@ -3,7 +3,7 @@ import type { Frame } from '../api'
 import { invalidateObservations } from '../api'
 import { LAYERS, type LayerId } from '../layers'
 
-export type LoadState = 'loading' | 'ready' | 'empty' | 'error'
+type LoadState = 'loading' | 'ready' | 'empty' | 'error'
 type State = { layer: LayerId; showStations: boolean; frames: Frame[]; index: number; playing: boolean; speed: number;
   selectedStation: number | null; followLatest: boolean; loadState: LoadState; refreshKey: number; cursorTime: string | null }
 export const currentFrame = (s: State): Frame | undefined => s.frames[s.index]
@@ -39,7 +39,8 @@ export function createTimelineStore() {
       set({ frames, index, cursorTime: frames[index]?.time ?? time, loadState: frames.length ? 'ready' : 'empty', playing: frames.length > 1 && state.playing })
     },
     failLoad(layer: LayerId, token: number) {
-      if (layer === state.layer && token === request) set({ loadState: 'error', playing: false })
+      // Frames already on screen stay, and so does playback: a failed background refresh is reported, not fatal.
+      if (layer === state.layer && token === request) set({ loadState: 'error' })
     },
     retry() { request++; invalidateObservations(); set({ refreshKey: state.refreshKey + 1, loadState: 'loading' }) },
     seek(index: number) {

@@ -28,6 +28,7 @@ export const zh = {
   'age.now': '剛剛',
 
   'status.loadingMap': '載入地圖中…',
+  'status.mapFailed': '無法載入地圖',
   'status.loadingWeather': '載入天氣資料中…',
   'status.timelineError': '無法更新時間軸',
   'status.empty': '有新資料時會自動顯示。',
@@ -61,28 +62,23 @@ export type Key = keyof typeof zh
 type Params = Record<string, string | number>
 
 /** Fills `{name}` placeholders. One left unfilled stays visible, so a forgotten parameter is noticed rather than silently blank. */
-export const translate = (key: Key, params: Params = {}) =>
+export const t = (key: Key, params: Params = {}) =>
   zh[key].replace(/\{(\w+)\}/g, (hole, name: string) => name in params ? String(params[name]) : hole)
 
 // Always Taiwan time: the data is about Taiwan, wherever the viewer's laptop thinks it is.
 // h23: midnight is 00:00 (zh-TW prints 24:00 with `hour12: false`).
 const clock = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', ...o })
-const ago = new Intl.RelativeTimeFormat('zh-TW')
+export const time = clock({}) // 13:50
+export const weekdayTime = clock({ weekday: 'short' }) // 週一 13:50 — the ends of a 24 h range, where a bare time does not say which day
+export const dayTime = clock({ day: 'numeric', month: 'short' }) // 10月5日 13:50
+export const shortDayTime = clock({ day: 'numeric', month: 'numeric' }) // 10/5 13:50 — where room is short
+export const fullTime = clock({ weekday: 'short', day: 'numeric', month: 'short' }) // 10月5日 週一 13:50
+export const weekday = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', weekday: 'short' }) // 週一
+export const monthDay = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }) // 10/5
 
-// ponytail: Chinese only (the English switch was removed); `useT` stays so call sites did not change.
-export const I18N = {
-  t: translate,
-  time: clock({}), // 13:50
-  weekdayTime: clock({ weekday: 'short' }), // 週一 13:50 — the ends of a 24 h range, where a bare time does not say which day
-  dayTime: clock({ day: 'numeric', month: 'short' }), // 10月5日 13:50
-  shortDayTime: clock({ day: 'numeric', month: 'numeric' }), // 10/5 13:50 — where room is short
-  fullTime: clock({ weekday: 'short', day: 'numeric', month: 'short' }), // 10月5日 週一 13:50
-  weekday: new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', weekday: 'short' }), // 週一
-  monthDay: new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }), // 10/5
-  /** How old a frame is: minutes up to an hour and a half, hours up to two days, days beyond. A viewer's clock running behind must not read as "in 3 minutes". */
-  age(time: number, now: number) {
-    const min = Math.round((now - time) / 60e3)
-    return min <= 0 ? zh['age.now'] : min < 90 ? ago.format(-min, 'minute') : min < 48 * 60 ? ago.format(-Math.round(min / 60), 'hour') : ago.format(-Math.round(min / 1440), 'day')
-  },
+const ago = new Intl.RelativeTimeFormat('zh-TW')
+/** How old a frame is: minutes up to an hour and a half, hours up to two days, days beyond. A viewer's clock running behind must not read as "in 3 minutes". */
+export function age(time: number, now: number) {
+  const min = Math.round((now - time) / 60e3)
+  return min <= 0 ? zh['age.now'] : min < 90 ? ago.format(-min, 'minute') : min < 48 * 60 ? ago.format(-Math.round(min / 60), 'hour') : ago.format(-Math.round(min / 1440), 'day')
 }
-export const useT = () => I18N

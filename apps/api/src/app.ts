@@ -33,5 +33,4 @@ app.onError((e, c) => {
   return c.json({ error: 'internal error' }, 500)
 })
 
-export type AppType = typeof app
 export default app

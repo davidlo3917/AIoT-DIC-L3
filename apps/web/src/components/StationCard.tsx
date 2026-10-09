@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getForecast, getHistory, getObservations, type ForecastPeriod, type Observation, type Readings, type Station } from '../api'
-import { useT } from '../i18n'
+import { dayTime, monthDay, t, weekday } from '../i18n'
 import { LAYERS } from '../layers'
 import { RAMPS, type Variable } from '../ramps'
 import { actions, currentFrame, useStore } from '../timeline/store'
@@ -13,13 +13,13 @@ const MOUNTAIN_M = 1000 // above this a station reads well below its township's 
 const DAY = 86400e3
 
 export default function StationCard({ stations }: { stations: Station[] }) {
-  const { t, dayTime, weekday, monthDay } = useT()
   const id = useStore((s) => s.selectedStation), variable = LAYERS[useStore((s) => s.layer)].stations
   const station = stations.find((s) => s.id === id)
   const [rows, setRows] = useState<Row[] | 'error' | null>(null)
   const frame = useStore(currentFrame), refreshKey = useStore((s) => s.refreshKey)
   const [snapshot, setSnapshot] = useState<{ time: string; value: Observation | null; error?: boolean } | null>(null)
 
+  // Effects key on the station's ids, not the object: a refreshed station list must not fetch everything twice.
   useEffect(() => {
     if (!station || !frame) return
     let alive = true
@@ -28,7 +28,7 @@ export default function StationCard({ stations }: { stations: Station[] }) {
       () => { if (alive) setSnapshot({ time: frame.time, value: null, error: true }) },
     )
     return () => { alive = false }
-  }, [station, frame, refreshKey])
+  }, [station?.id, frame, refreshKey])
 
   useEffect(() => {
     if (!station) return
@@ -36,7 +36,7 @@ export default function StationCard({ stations }: { stations: Station[] }) {
     const ac = new AbortController()
     getHistory(station.cwaStationId, ac.signal).then(setRows, (e) => e.name === 'AbortError' || setRows('error'))
     return () => ac.abort()
-  }, [station, refreshKey])
+  }, [station?.cwaStationId, refreshKey])
 
   // The township's forecast, not the station's: CWA forecasts per 鄉鎮, and every station names its own.
   const [forecast, setForecast] = useState<ForecastPeriod[] | 'error' | null>(null)
@@ -46,7 +46,7 @@ export default function StationCard({ stations }: { stations: Station[] }) {
     const ac = new AbortController()
     getForecast(station.county, station.town, ac.signal).then(setForecast, (e) => e.name === 'AbortError' || setForecast('error'))
     return () => ac.abort()
-  }, [station, refreshKey])
+  }, [station?.county, station?.town, refreshKey])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && actions.selectStation(null)
@@ -67,8 +67,8 @@ export default function StationCard({ stations }: { stations: Station[] }) {
   // centred on the map time when it is further back, so its dashed line is always on the chart.
   const end = Math.min(now, (frame ? Date.parse(frame.time) : now) + DAY / 2), start = end - DAY
   const points = data.flatMap((r) => {
-    const t = Date.parse(r.observedAt), v = r[FIELD[variable]]
-    return v == null || t < start || t > end ? [] : [{ t, v }]
+    const at = Date.parse(r.observedAt), v = r[FIELD[variable]]
+    return v == null || at < start || at > end ? [] : [{ t: at, v }]
   })
   const today = Math.floor((now + 8 * 3600e3) / DAY) // Taiwan's calendar day
 
@@ -134,7 +134,6 @@ export default function StationCard({ stations }: { stations: Station[] }) {
 
 /** One half-day: an icon, the half's temperature (the high by day, the low by night) and the chance of rain. */
 function ForecastCell({ p, part }: { p: ForecastDay['day']; part: 'day' | 'night' }) {
-  const { t } = useT()
   if (!p) return <td className="text-slate-600">—</td>
   const temp = part === 'day' ? p.max : p.min, wet = (p.rainChance ?? 0) >= 30 // where people start to pack an umbrella
   return (

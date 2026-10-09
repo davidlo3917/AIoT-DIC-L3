@@ -4,7 +4,9 @@ import postgres from 'postgres'
 // prepare:false — DATABASE_URL is Supabase's transaction pooler, which can't hold prepared statements.
 // max:1 — one connection per serverless instance; the pooler does the pooling.
 // ssl:'require' — postgres.js connects in plaintext unless told otherwise.
+// connect/idle timeouts — a pooler socket that wedges (seen from local dev) is dropped and redialled instead of
+// holding the one connection, and every request behind it, until the function times out.
 // ponytail: encrypts without checking the certificate; pass Supabase's CA (`ssl: { ca }`) if an active man-in-the-middle ever matters.
-const sql = postgres(process.env.DATABASE_URL!, { prepare: false, max: 1, ssl: 'require' })
+const sql = postgres(process.env.DATABASE_URL!, { prepare: false, max: 1, ssl: 'require', connect_timeout: 10, idle_timeout: 20 })
 
 export const db = drizzle(sql)

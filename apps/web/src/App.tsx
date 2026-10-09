@@ -3,14 +3,13 @@ import { getStations, type Station } from './api'
 import LayerPanel, { StationsToggle } from './components/LayerPanel'
 import Legend from './components/Legend'
 import StationCard from './components/StationCard'
-import { useT } from './i18n'
+import { t } from './i18n'
 import MapView from './map/MapView'
 import { STATUS, type Status } from './status'
 import Timeline from './timeline/Timeline'
 import { useStore } from './timeline/store'
 
 export default function App() {
-  const { t } = useT()
   const [status, setStatus] = useState<Status>(null)
   const [stations, setStations] = useState<Station[]>([])
   const [stationError, setStationError] = useState(false)

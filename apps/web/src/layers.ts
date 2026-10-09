@@ -4,7 +4,7 @@ import { RADAR_RAMP, RAMPS, type Ramp, type Variable } from './ramps'
 export type LayerId = 'temperature' | 'rain' | 'radar' | 'humidity'
 
 /** Names and one-line explanations live in the dictionary (i18n.ts) as `layer.<id>` and `layer.<id>.hint`. */
-export type LayerDef = {
+type LayerDef = {
   frames: FrameLayer // which timeline it runs on
   everyMin: 10 | 60 // how often CWA publishes a new frame
   loop: number // hours replayed when Play starts from the newest frame: enough to see the weather move, short enough to sit through

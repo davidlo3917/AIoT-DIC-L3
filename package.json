@@ -9,7 +9,6 @@
     "build": "pnpm --filter web build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "db:generate": "pnpm --filter api db:generate",
     "db:push": "pnpm --filter api db:push"
   }
 }

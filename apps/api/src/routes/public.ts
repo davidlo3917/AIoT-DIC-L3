@@ -1,4 +1,4 @@
-import { and, asc, between, desc, eq, getTableColumns, sql } from 'drizzle-orm'
+import { and, asc, between, eq, getTableColumns, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { z } from 'zod'
@@ -18,14 +18,13 @@ const camel = (s: string) => s.replace(/_(\w)/g, (_, c) => c.toUpperCase())
 const newestNonNull = sql.join(READINGS.map((col) =>
   sql.raw(`(array_agg(${col} order by observed_at desc) filter (where ${col} is not null))[1] as "${camel(col)}"`)), sql`, `)
 
-function readingsAt(at: Date, stationId?: number) {
+function readingsAt(at: Date) {
   return db.execute(sql`
     select station_id as "stationId", ${newestNonNull},
       to_char(max(observed_at) at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "observedAt" -- same ISO shape drizzle gives /history
     from station_observations
     where observed_at <= ${at.toISOString()}::timestamptz
       and observed_at > ${at.toISOString()}::timestamptz - make_interval(mins => ${LOOKBACK_MINUTES})
-      ${stationId === undefined ? sql`` : sql`and station_id = ${stationId}`}
     group by station_id`)
 }
 
@@ -56,14 +55,6 @@ export const publicRoutes = new Hono()
     return c.json(await db.select(stationColumns).from(stations).orderBy(asc(stations.id)))
   })
 
-  .get('/stations/:id', async (c) => {
-    const station = await findStation(c.req.param('id'))
-    if (!station) return c.json({ error: 'station not found' }, 404)
-    const [latest] = await readingsAt(new Date(), station.id)
-    c.header('Cache-Control', cache(60))
-    return c.json({ ...station, latest: latest ?? null })
-  })
-
   .get('/stations/:id/history', async (c) => {
     const { from, to } = parse(rangeQuery, c.req.query())
     const station = await findStation(c.req.param('id'))
@@ -79,13 +70,17 @@ export const publicRoutes = new Hono()
   .get('/observations', async (c) => {
     const { at } = parse(atQuery, c.req.query())
     c.header('Cache-Control', cache(60))
-    return c.json({ at, lookbackMinutes: LOOKBACK_MINUTES, observations: await readingsAt(at) })
+    return c.json({ at, observations: await readingsAt(at) })
   })
 
   // One township's coming week, straight from CWA: nothing is stored, and the CDN answers repeat visitors (CWA
   // reissues these every 6 h). Keyed by township, not station, so the 1,367 stations share 368 cache entries.
   .get('/forecast', async (c) => {
     const { county, town } = parse(forecastQuery, c.req.query())
+    // Only townships a station names reach CWA: a made-up name must not spend a call on our key, and the CDN keeps
+    // no 404s. Every station's township is in CWA's list (checked 2026-10-09).
+    const [known] = await db.select({ id: stations.id }).from(stations).where(and(eq(stations.county, county), eq(stations.town, town))).limit(1)
+    if (!known) return c.json({ error: 'township not found' }, 404)
     const periods = normalizeForecast(await fetchDatastore(COUNTY_FORECASTS[county], { LocationName: town, ElementName: ELEMENTS.join(',') }, 10_000))
     if (!periods) return c.json({ error: 'township not found' }, 404)
     c.header('Cache-Control', cache(1800))
@@ -111,12 +106,11 @@ export const publicRoutes = new Hono()
     }
 
     const rows = await db.select().from(weatherFrames)
-      .where(and(eq(weatherFrames.layerType, layer), between(weatherFrames.validAt, from, to))).orderBy(asc(weatherFrames.validAt), desc(weatherFrames.issuedAt))
+      .where(and(eq(weatherFrames.layerType, layer), between(weatherFrames.validAt, from, to))).orderBy(asc(weatherFrames.validAt))
     return c.json({
       layer,
       frames: rows.map((f) => ({
-        time: f.validAt.toISOString(), url: publicUrl(f.storagePath), issuedAt: f.issuedAt?.toISOString() ?? null,
-        bounds: [f.minLon, f.minLat, f.maxLon, f.maxLat], meta: f.metadataJson,
+        time: f.validAt.toISOString(), url: publicUrl(f.storagePath), bounds: [f.minLon, f.minLat, f.maxLon, f.maxLat], meta: f.metadataJson,
       })),
     })
   })

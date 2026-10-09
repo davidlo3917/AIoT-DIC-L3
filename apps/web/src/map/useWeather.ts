@@ -8,7 +8,6 @@ import { loadField, loadImage, paint, type Field } from './layers/grid'
 import { idw } from './layers/idw'
 import { addStationLayers, updateStations, setStationsVisible } from './layers/stations'
 import { REFERENCE_LAYER } from './basemap'
-import { successfulCache } from './landMask'
 
 const SURFACE = 'surface'
 const COAST = 'surface-coast' // copy of the basemap's water, drawn over land-only layers so the real coastline clips them
@@ -34,8 +33,12 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   const speedNow = useRef(speed)
   speedNow.current = speed
   const since = useRef(0)
-  const [getLandMask] = useState(() => successfulCache(() => getFrames('temperature-grid')
-    .then((frames) => frames.length ? loadField(frames[frames.length - 1]) : null)))
+  // Humidity is interpolated onto CWA's temperature grid, whose land cells are Taiwan's outline. Fetched once and
+  // shared; a failure or an empty timeline is forgotten so the next frame tries again.
+  const landMask = useRef<Promise<Field | null> | null>(null)
+  const getLandMask = () => landMask.current ??= getFrames('temperature-grid')
+    .then((frames) => frames.length ? loadField(frames[frames.length - 1]) : null)
+    .then((mask) => { if (!mask) landMask.current = null; return mask }, (e) => { landMask.current = null; throw e })
 
   useEffect(() => {
     if (!map) return
@@ -205,9 +208,13 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     let alive = true
     getObservations(frame.time).then((obs) => {
       if (!alive) return
-      updateStations(map, stations, obs, layer.stations, true)
+      updateStations(map, stations, obs, layer.stations)
       if (!obs.length) setStationStatus(STATUS.noStationReadings)
-    }, () => { if (alive) setStationStatus(STATUS.stationReadingsFailed) })
+    }, () => {
+      if (!alive) return
+      setStationsVisible(map, false) // the previous frame's values must not pass for this time's
+      setStationStatus(STATUS.stationReadingsFailed)
+    })
     return () => { alive = false }
   }, [map, frame, layer.stations, stations, showStations, refreshKey])
 

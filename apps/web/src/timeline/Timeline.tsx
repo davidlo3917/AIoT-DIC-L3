@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PLAYBACK_DAYS } from '../api'
-import { useT } from '../i18n'
+import { age, dayTime, fullTime, shortDayTime, t } from '../i18n'
 import { LAYERS } from '../layers'
 import { STATUS, type Status } from '../status'
 import { shortcut } from './shortcut'
@@ -13,7 +13,6 @@ const ICONS = { prev: 'M6 5h2v14H6zM20 5v14L9 12z', play: 'M8 5v14l11-7z', pause
 const Icon = ({ d }: { d: string }) => <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true"><path d={d} /></svg>
 
 export default function Timeline({ status }: { status: Status }) {
-  const { t, age, dayTime, fullTime, shortDayTime } = useT()
   const frames = useStore((s) => s.frames), index = useStore((s) => s.index), playing = useStore((s) => s.playing), speed = useStore((s) => s.speed)
   const frame = useStore(currentFrame)
   const loadState = useStore((s) => s.loadState), followLatest = useStore((s) => s.followLatest)

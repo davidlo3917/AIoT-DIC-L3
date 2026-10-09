@@ -10,6 +10,7 @@ const retry = { key: 'retry', run: actions.retry } as const
 // every render would re-run them forever. Waiting has no button; anything that went wrong can be retried.
 export const STATUS = {
   loadingMap: { key: 'status.loadingMap' },
+  mapFailed: { key: 'status.mapFailed', action: { key: 'retry', run: () => location.reload() } }, // the basemap never came: start over
   loadingWeather: { key: 'status.loadingWeather' },
   timelineError: { key: 'status.timelineError', action: retry },
   empty: { key: 'status.empty', action: retry },

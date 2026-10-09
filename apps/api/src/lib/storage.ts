@@ -7,12 +7,13 @@ const env = () => {
 
 export const publicUrl = (path: string) => `${process.env.SUPABASE_URL}/storage/v1/object/public/${process.env.SUPABASE_STORAGE_BUCKET}/${path}`
 
-export async function upload(path: string, body: Buffer, contentType: 'image/png' | 'image/jpeg') {
+/** Every frame is a PNG. */
+export async function upload(path: string, body: Buffer) {
   const { base, bucket, headers } = env()
   const res = await fetch(`${base}/object/${bucket}/${path}`, {
     method: 'POST',
     // Frame paths embed their timestamp, so a given path never changes content: cache forever, overwrite safely.
-    headers: { ...headers, 'Content-Type': contentType, 'Cache-Control': 'max-age=31536000, immutable', 'x-upsert': 'true' },
+    headers: { ...headers, 'Content-Type': 'image/png', 'Cache-Control': 'max-age=31536000, immutable', 'x-upsert': 'true' },
     body: new Uint8Array(body),
     signal: AbortSignal.timeout(30_000),
   })

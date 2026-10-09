@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useT } from '../i18n'
+import { t, time, weekdayTime } from '../i18n'
 import { chartExtent } from './chartData'
 
 type Point = { t: number; v: number }
@@ -7,18 +7,17 @@ const W = 384, H = 72, PAD = { l: 4, r: 4, t: 8, b: 14 }
 
 /** One series, so no legend: the card title names it. 2px line, recessive axis, crosshair + tooltip on hover/touch. */
 export default function Sparkline({ points, unit, bars, format, selectedTime }: { points: Point[]; unit: string; bars?: boolean; format: (v: number) => string; selectedTime?: string }) {
-  const { t, time, weekdayTime } = useT()
   const [hover, setHover] = useState<number | null>(null)
   if (points.length < 2) return <p className="py-3 text-sm text-slate-400">{t('chart.short')}</p>
 
   const t0 = points[0].t, t1 = points[points.length - 1].t
   const { min, max, low: lo, high: hi } = chartExtent(points, bars)
   const selected = selectedTime ? Date.parse(selectedTime) : NaN
-  const x = (t: number) => PAD.l + ((t - t0) / (t1 - t0)) * (W - PAD.l - PAD.r)
+  const x = (at: number) => PAD.l + ((at - t0) / (t1 - t0)) * (W - PAD.l - PAD.r)
   const y = (v: number) => PAD.t + (1 - (v - lo) / (hi - lo)) * (H - PAD.t - PAD.b)
   const nearest = (clientX: number, rect: DOMRect) => {
-    const t = t0 + ((((clientX - rect.left) / rect.width) * W - PAD.l) / (W - PAD.l - PAD.r)) * (t1 - t0)
-    return points.reduce((best, p, i) => (Math.abs(p.t - t) < Math.abs(points[best].t - t) ? i : best), 0)
+    const at = t0 + ((((clientX - rect.left) / rect.width) * W - PAD.l) / (W - PAD.l - PAD.r)) * (t1 - t0)
+    return points.reduce((best, p, i) => (Math.abs(p.t - at) < Math.abs(points[best].t - at) ? i : best), 0)
   }
   const h = hover == null ? null : points[hover]
   const barW = Math.max(1.5, ((W - PAD.l - PAD.r) / points.length) * 0.7)

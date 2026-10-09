@@ -17,7 +17,7 @@ export const rangeQuery = z.object({ from: instant.optional(), to: instant.optio
 /** `?at=` — defaults to now. */
 export const atQuery = z.object({ at: instant.optional() }).transform((q) => ({ at: q.at ?? new Date() }))
 
-export const LAYERS = ['stations', 'radar', 'satellite', 'wind', 'rain-grid', 'temperature-grid'] as const
+export const LAYERS = ['stations', 'radar', 'rain-grid', 'temperature-grid'] as const
 export const layerQuery = z.object({ layer: z.enum(LAYERS) })
 
 // CWA station ids are short alphanumerics ("466940", "C0TB40"); reject anything else before it reaches SQL or logs.

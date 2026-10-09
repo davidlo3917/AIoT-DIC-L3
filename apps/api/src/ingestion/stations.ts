@@ -14,16 +14,20 @@ const CHUNK = 2000
 const chunks = <T>(xs: T[], n: number) => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, (i + 1) * n))
 
 export async function ingestStations() {
-  const fetched = await Promise.all(DATASETS.map(async (id) => {
+  // Each dataset stands alone: one failing must not lose the other two's 10-minute readings, which CWA never serves again.
+  const results = await Promise.allSettled(DATASETS.map(async (id) => {
     const records = datastoreResponse.parse(await fetchDatastore(id)).records.Station
     const ok = records.map(normalizeStation).filter((r): r is NormalizedStation => r !== null)
     return { id, received: records.length, skipped: records.length - ok.length, ok }
   }))
+  const fetched = results.map((r, i) => r.status === 'fulfilled' ? r.value
+    : (console.error(`ingest ${DATASETS[i]} failed:`, r.reason), { id: DATASETS[i], received: 0, skipped: 0, ok: [], error: true }))
+  if (fetched.every((f) => 'error' in f)) throw new Error('every station dataset failed')
   const all = fetched.flatMap((f) => f.ok)
   const meta = await upsertStations(all)
   const { observations, newObservations } = await storeObservations(all)
   return {
-    datasets: fetched.map(({ id, received, skipped }) => ({ id, received, skipped })),
+    datasets: fetched.map(({ ok: _, ...rest }) => rest),
     stations: meta,
     observations,
     newObservations,

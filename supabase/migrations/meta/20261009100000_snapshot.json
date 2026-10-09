@@ -1,0 +1,317 @@
+{
+  "id": "d1c78699-6f8b-4d79-8958-ecb02980fd50",
+  "prevId": "465b0c0f-4db5-4677-8970-cf36a2822cc3",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.station_observations": {
+      "name": "station_observations",
+      "schema": "",
+      "columns": {
+        "station_id": {
+          "name": "station_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "temperature": {
+          "name": "temperature",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "humidity": {
+          "name": "humidity",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pressure": {
+          "name": "pressure",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wind_speed": {
+          "name": "wind_speed",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wind_direction": {
+          "name": "wind_direction",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gust_speed": {
+          "name": "gust_speed",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rain_1h": {
+          "name": "rain_1h",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rain_24h": {
+          "name": "rain_24h",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "station_observations_observed_at_idx": {
+          "name": "station_observations_observed_at_idx",
+          "columns": [
+            {
+              "expression": "observed_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "station_observations_station_id_stations_id_fk": {
+          "name": "station_observations_station_id_stations_id_fk",
+          "tableFrom": "station_observations",
+          "tableTo": "stations",
+          "columnsFrom": [
+            "station_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "station_observations_station_id_observed_at_pk": {
+          "name": "station_observations_station_id_observed_at_pk",
+          "columns": [
+            "station_id",
+            "observed_at"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.stations": {
+      "name": "stations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "cwa_station_id": {
+          "name": "cwa_station_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "county": {
+          "name": "county",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "town": {
+          "name": "town",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latitude": {
+          "name": "latitude",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "longitude": {
+          "name": "longitude",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "elevation": {
+          "name": "elevation",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "stations_cwa_station_id_unique": {
+          "name": "stations_cwa_station_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "cwa_station_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.weather_frames": {
+      "name": "weather_frames",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "layer_type": {
+          "name": "layer_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_at": {
+          "name": "valid_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_path": {
+          "name": "storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "min_lat": {
+          "name": "min_lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_lat": {
+          "name": "max_lat",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "min_lon": {
+          "name": "min_lon",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_lon": {
+          "name": "max_lon",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata_json": {
+          "name": "metadata_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "weather_frames_layer_valid_at_idx": {
+          "name": "weather_frames_layer_valid_at_idx",
+          "columns": [
+            {
+              "expression": "layer_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "valid_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "weather_frames_storage_path_unique": {
+          "name": "weather_frames_storage_path_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "storage_path"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
