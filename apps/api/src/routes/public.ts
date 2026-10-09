@@ -2,10 +2,12 @@ import { and, asc, between, desc, eq, getTableColumns, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { z } from 'zod'
+import { fetchDatastore } from '../cwa/client.js'
+import { COUNTY_FORECASTS, ELEMENTS, normalizeForecast } from '../cwa/forecast.js'
 import { db } from '../db/client.js'
 import { publicUrl } from '../lib/storage.js'
 import { stationObservations as obs, stations, weatherFrames } from '../db/schema.js'
-import { atQuery, layerQuery, rangeQuery, stationIdParam } from './query.js'
+import { atQuery, forecastQuery, layerQuery, rangeQuery, stationIdParam } from './query.js'
 
 // Stations report at different cadences (10 min / hourly) and CWA publishes ~15 min late, so "the reading at T"
 // means the newest non-null value per field inside this window before T.
@@ -78,6 +80,16 @@ export const publicRoutes = new Hono()
     const { at } = parse(atQuery, c.req.query())
     c.header('Cache-Control', cache(60))
     return c.json({ at, lookbackMinutes: LOOKBACK_MINUTES, observations: await readingsAt(at) })
+  })
+
+  // One township's coming week, straight from CWA: nothing is stored, and the CDN answers repeat visitors (CWA
+  // reissues these every 6 h). Keyed by township, not station, so the 1,367 stations share 368 cache entries.
+  .get('/forecast', async (c) => {
+    const { county, town } = parse(forecastQuery, c.req.query())
+    const periods = normalizeForecast(await fetchDatastore(COUNTY_FORECASTS[county], { LocationName: town, ElementName: ELEMENTS.join(',') }, 10_000))
+    if (!periods) return c.json({ error: 'township not found' }, 404)
+    c.header('Cache-Control', cache(1800))
+    return c.json({ county, town, periods })
   })
 
   // The timeline's one contract: every layer answers "which instants do you have?" in the same shape.

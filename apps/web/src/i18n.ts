@@ -50,6 +50,10 @@ export const zh = {
   'chart.label': '過去 24 小時，{min} 到 {max} {unit}', 'chart.mapTime': '；地圖時間 {time}',
   'chart.selected': '地圖時間', 'chart.range': '最低 {min} · 最高 {max} {unit}',
 
+  'forecast.title': '{town}天氣預報', 'forecast.loading': '載入預報中…', 'forecast.failed': '無法載入預報。',
+  'forecast.rain': '降雨機率', 'forecast.mountain': '預報為整個鄉鎮的天氣；本站海拔較高，實際氣溫通常較低。',
+  'forecast.today': '今天', 'forecast.tomorrow': '明天', 'forecast.early': '凌晨', 'forecast.day': '白天', 'forecast.night': '晚上',
+
   'map.title': '地圖', 'map.zoomIn': '放大', 'map.zoomOut': '縮小', 'map.attribution': '地圖資料來源',
 }
 
@@ -64,6 +68,7 @@ export const translate = (key: Key, params: Params = {}) =>
 // h23: midnight is 00:00 (zh-TW prints 24:00 with `hour12: false`).
 const clock = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', ...o })
 const ago = new Intl.RelativeTimeFormat('zh-TW')
+const weekday = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', weekday: 'short' })
 
 // ponytail: Chinese only (the English switch was removed); `useT` stays so call sites did not change.
 export const I18N = {
@@ -72,6 +77,14 @@ export const I18N = {
   weekdayTime: clock({ weekday: 'short' }), // 週一 13:50 — the ends of a 24 h range, where a bare time does not say which day
   dayTime: clock({ day: 'numeric', month: 'short' }), // 10月5日 13:50
   fullTime: clock({ weekday: 'short', day: 'numeric', month: 'short' }), // 10月5日 週一 13:50
+  /** A forecast period by when it starts: 今天白天, 明天晚上, 週日凌晨… */
+  period(start: number, now: number) {
+    // Taiwan has kept UTC+8 without daylight saving since 1979, so its calendar day is plain arithmetic.
+    const local = (t: number) => t + 8 * 3600e3, day = (t: number) => Math.floor(local(t) / 86400e3), hour = Math.floor(local(start) / 3600e3) % 24
+    const ahead = day(start) - day(now)
+    const when = ahead === 0 ? zh['forecast.today'] : ahead === 1 ? zh['forecast.tomorrow'] : weekday.format(start)
+    return when + zh[hour < 6 ? 'forecast.early' : hour < 18 ? 'forecast.day' : 'forecast.night']
+  },
   /** How old a frame is: minutes up to an hour and a half, hours beyond. A viewer's clock running behind must not read as "in 3 minutes". */
   age(time: number, now: number) {
     const min = Math.round((now - time) / 60e3)

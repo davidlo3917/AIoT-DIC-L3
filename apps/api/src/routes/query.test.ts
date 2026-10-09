@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { atQuery, gridsQuery, layerQuery, MAX_RANGE_DAYS, rangeQuery, stationIdParam } from './query.js'
+import { atQuery, forecastQuery, gridsQuery, layerQuery, MAX_RANGE_DAYS, rangeQuery, stationIdParam } from './query.js'
 
 test('grid ingest takes one known product, or none for all', () => {
   assert.equal(gridsQuery.parse({}).layer, undefined)
@@ -39,4 +39,13 @@ test('at defaults to now; layer is a closed set', () => {
 test('station id shape', () => {
   for (const ok of ['466940', 'C0TB40', 'C1I230']) assert.equal(stationIdParam.safeParse(ok).success, true)
   for (const bad of ['', '1', "46' or 1=1", '../etc', 'x'.repeat(40)]) assert.equal(stationIdParam.safeParse(bad).success, false)
+})
+
+test('forecast takes a known county and a township-shaped name, nothing that could reach CWA as extra parameters', () => {
+  assert.deepEqual(forecastQuery.parse({ county: '彰化縣', town: '田中鎮' }), { county: '彰化縣', town: '田中鎮' })
+  assert.ok(forecastQuery.safeParse({ county: '屏東縣', town: '三地門鄉' }).success)
+  assert.equal(forecastQuery.safeParse({ county: '台北市', town: '中正區' }).success, false) // CWA spells it 臺北市
+  assert.equal(forecastQuery.safeParse({ county: '彰化縣', town: '田中鎮&ElementName=x' }).success, false)
+  assert.equal(forecastQuery.safeParse({ county: '彰化縣', town: 'Tianzhong' }).success, false)
+  assert.equal(forecastQuery.safeParse({ county: '彰化縣' }).success, false)
 })

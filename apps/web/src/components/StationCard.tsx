@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getHistory, getObservations, type Observation, type Readings, type Station } from '../api'
+import { getForecast, getHistory, getObservations, type ForecastPeriod, type Observation, type Readings, type Station } from '../api'
 import { useT } from '../i18n'
 import { LAYERS } from '../layers'
 import { RAMPS, type Variable } from '../ramps'
@@ -9,9 +9,10 @@ import { stationSnapshot } from './chartData'
 
 type Row = Readings & { observedAt: string }
 const FIELD: Record<Variable, keyof Readings> = { temperature: 'temperature', humidity: 'humidity', rain: 'rain1h' }
+const MOUNTAIN_M = 1000 // above this a station reads well below its township's forecast (玉山 sits in 信義鄉)
 
 export default function StationCard({ stations }: { stations: Station[] }) {
-  const { t, dayTime } = useT()
+  const { t, dayTime, period } = useT()
   const id = useStore((s) => s.selectedStation), variable = LAYERS[useStore((s) => s.layer)].stations
   const station = stations.find((s) => s.id === id)
   const [rows, setRows] = useState<Row[] | 'error' | null>(null)
@@ -36,6 +37,16 @@ export default function StationCard({ stations }: { stations: Station[] }) {
     return () => ac.abort()
   }, [station, refreshKey])
 
+  // The township's forecast, not the station's: CWA forecasts per 鄉鎮, and every station names its own.
+  const [forecast, setForecast] = useState<ForecastPeriod[] | 'error' | null>(null)
+  useEffect(() => {
+    if (!station?.county || !station.town) return
+    setForecast(null)
+    const ac = new AbortController()
+    getForecast(station.county, station.town, ac.signal).then(setForecast, (e) => e.name === 'AbortError' || setForecast('error'))
+    return () => ac.abort()
+  }, [station, refreshKey])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && actions.selectStation(null)
     window.addEventListener('keydown', onKey)
@@ -47,10 +58,11 @@ export default function StationCard({ stations }: { stations: Station[] }) {
   const current = snapshot?.time === frame?.time ? snapshot : null
   const num = (k: keyof Readings, digits = 1) => { const v = current?.value?.[k]; return v == null ? '—' : v.toFixed(digits) }
   const dir = current?.value?.windDirection, compass = t('compass').split(',')
+  const now = Date.now(), upcoming = Array.isArray(forecast) ? forecast.filter((p) => Date.parse(p.end) > now).slice(0, 3) : []
   const points = data.flatMap((r) => { const v = r[FIELD[variable]]; return v == null ? [] : [{ t: Date.parse(r.observedAt), v }] })
 
   return (
-    <aside aria-label={t('station.label', { name: station.name })} className="weather-panel pointer-events-auto max-h-[40dvh] w-full overflow-y-auto p-3 sm:max-h-none sm:w-72 sm:max-w-full">
+    <aside aria-label={t('station.label', { name: station.name })} className="weather-panel pointer-events-auto max-h-[40dvh] w-full overflow-y-auto p-3 sm:max-h-none sm:w-80 sm:max-w-full">
       <header className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="truncate text-lg font-semibold">{station.name}</h2>
@@ -64,9 +76,29 @@ export default function StationCard({ stations }: { stations: Station[] }) {
       <dl className="mb-2 grid grid-cols-3 gap-x-2 gap-y-1.5 text-sm">
         {[[t('station.temp'), num('temperature'), '°C'], [t('station.humidity'), num('humidity', 0), '%'], [t('station.pressure'), num('pressure'), 'hPa'],
           [t('station.wind'), num('windSpeed'), `m/s ${dir == null ? '' : compass[Math.round(dir / 45) % 8]}`], [t('station.rain1h'), num('rain1h'), 'mm'], [t('station.rain24h'), num('rain24h'), 'mm']].map(([k, v, u]) => (
-          <div key={k}><dt className="text-slate-400">{k}</dt><dd className="tabular-nums"><span className="text-base font-medium">{v}</span> <span className="text-slate-400">{u}</span></dd></div>
+          <div key={k}><dt className="text-slate-400">{k}</dt><dd className="whitespace-nowrap tabular-nums"><span className="text-base font-medium">{v}</span> <span className="text-slate-400">{u}</span></dd></div>
         ))}
       </dl>
+      {station.county && station.town && (
+        <section className="mb-3 border-y border-[var(--border)] py-2">
+          <h3 className="mb-1 text-sm text-slate-400">{t('forecast.title', { town: station.town })}</h3>
+          {forecast === null ? <p className="ui-muted py-1 text-sm">{t('forecast.loading')}</p> : forecast === 'error'
+            ? <p className="text-sm text-amber-200">{t('forecast.failed')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>
+            : (
+              <ul className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-baseline gap-x-3 gap-y-1 text-sm">
+                {upcoming.map((p) => (
+                  <li key={p.start} className="contents">
+                    <span className="text-slate-400">{period(Date.parse(p.start), now)}</span>
+                    <span className="truncate">{p.weather ?? '—'}</span>
+                    <span className="whitespace-nowrap tabular-nums">{p.min ?? '—'}–{p.max ?? '—'}°</span>
+                    <span className="whitespace-nowrap text-slate-400 tabular-nums" title={t('forecast.rain')}><span aria-hidden="true">☂ </span><span className="sr-only">{t('forecast.rain')} </span>{p.rainChance == null ? '—' : `${p.rainChance}%`}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          {(station.elevation ?? 0) >= MOUNTAIN_M && <p className="mt-1 text-[13px] text-slate-400">{t('forecast.mountain')}</p>}
+        </section>
+      )}
       <h3 className="mb-0.5 text-sm text-slate-400">{t('station.chart', { name: t(`var.${variable}`) })}</h3>
       {rows === null ? <p className="ui-muted py-3 text-sm">{t('station.history.loading')}</p> : rows === 'error'
         ? <p className="text-sm text-amber-200">{t('station.history.failed')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>

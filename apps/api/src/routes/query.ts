@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { COUNTY_FORECASTS } from '../cwa/forecast.js'
 
 const instant = z.iso.datetime({ offset: true }).transform((s) => new Date(s))
 
@@ -21,6 +22,12 @@ export const layerQuery = z.object({ layer: z.enum(LAYERS) })
 
 // CWA station ids are short alphanumerics ("466940", "C0TB40"); reject anything else before it reaches SQL or logs.
 export const stationIdParam = z.string().regex(/^[A-Za-z0-9]{4,12}$/)
+
+/** `?county=&town=` for a township forecast: a known county, and a township name shaped like one (三地門鄉, 臺東市…). */
+export const forecastQuery = z.object({
+  county: z.enum(Object.keys(COUNTY_FORECASTS) as [keyof typeof COUNTY_FORECASTS]),
+  town: z.string().regex(/^\p{Script=Han}{1,5}[鄉鎮市區]$/u),
+})
 
 /** `?layer=` for the grid ingest endpoint: fetch that one product only (the extra radar job), or all of them when absent. */
 export const gridsQuery = z.object({ layer: z.enum(['temperature-grid', 'rain-grid', 'radar']).optional() })

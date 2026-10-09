@@ -32,4 +32,7 @@ export function getObservations(at: string): Promise<Observation[]> {
   }
   return hit
 }
+export type ForecastPeriod = { start: string; end: string; weather: string | null; weatherCode: string | null; min: number | null; max: number | null; rainChance: number | null }
+export const getForecast = (county: string, town: string, signal?: AbortSignal) =>
+  get<{ periods: ForecastPeriod[] }>(`/forecast?county=${encodeURIComponent(county)}&town=${encodeURIComponent(town)}`, signal).then((r) => r.periods)
 export const getHistory = (cwaId: string, signal?: AbortSignal) => get<{ observations: (Readings & { observedAt: string })[] }>(`/stations/${cwaId}/history`, signal).then((r) => r.observations)
