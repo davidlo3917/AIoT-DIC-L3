@@ -95,7 +95,8 @@ test('Play from the newest frame replays the layer\'s recent loop; from elsewher
 test('a forecast layer follows the last frame at or before now, never the future', () => {
   const now = Date.now(), forecast: Frame[] = [-30, -4, 2, 8, 14].map((h) => ({ time: new Date(now + h * 3600e3).toISOString() }))
   assert.equal(latestIndex(forecast, now), 1, 'the +2 h frame is nearer, but it is the future')
-  assert.equal(latestIndex(forecast, now + 1.6 * 3600e3), 2, 'half an hour of clock tolerance, as the age label gives')
+  assert.equal(latestIndex(forecast, now + 1.6 * 3600e3), 1, 'twenty-four minutes ahead is still the future: no readings for the dots yet')
+  assert.equal(latestIndex(forecast, now + 2 * 3600e3), 2, 'on the minute it is now')
   assert.equal(latestIndex([], now), -1)
   assert.equal(latestIndex(forecast.slice(2), now), 0, 'all in the future: the earliest')
   const store = createTimelineStore(), a = store.actions

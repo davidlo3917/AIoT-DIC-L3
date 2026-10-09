@@ -11,12 +11,12 @@ type State = { layer: LayerId; showStations: boolean; frames: Frame[]; index: nu
 export const currentFrame = (s: State): Frame | undefined => s.frames[s.index]
 
 /**
- * The frame to follow: the last one at or before now (with the half hour of clock tolerance the age label allows too).
- * That is simply the last frame for a layer that only has the past; the wind forecast's frames run on past now and
- * are reached by stepping or playing forward, so "即時" never shows the future.
+ * The frame to follow: the last one at or before now. That is simply the last frame for a layer that only has the
+ * past; the wind forecast's frames run on past now and are reached by stepping or playing forward, so "即時" never
+ * shows the future — a frame even minutes ahead has no station readings yet, and the dots would vanish.
  */
 export function latestIndex(frames: Frame[], now = Date.now()) {
-  const i = frames.findLastIndex((f) => Date.parse(f.time) <= now + 30 * 60e3)
+  const i = frames.findLastIndex((f) => Date.parse(f.time) <= now)
   return i >= 0 || !frames.length ? i : 0
 }
 

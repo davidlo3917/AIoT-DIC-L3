@@ -335,7 +335,7 @@ layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 
               follow-latest ? index = last frame ≤ now : index = last frame ≤ previous cursor time
 ```
 
-`latestIndex` is the last frame at or before now (plus the half hour of clock tolerance the age label allows): simply the last frame for every layer that only has the past; for the wind forecast the slider continues 3.5 days past it. Following it means that, as time passes, the re-poll moves the viewer to the next forecast frame the way it moves them to a new radar picture.
+`latestIndex` is the last frame at or before now, with no tolerance (a wind frame minutes ahead has no station readings yet, so the dots would vanish at 即時 for half of every hour): simply the last frame for every layer that only has the past; for the wind forecast the slider continues 3.5 days past it. Following it means that, as time passes, the re-poll moves the viewer to the next forecast frame the way it moves them to a new radar picture.
 
 - `from` is rounded down to the hour so every visitor in that hour asks the CDN the same URL.
 - Frames are re-polled every 5 minutes so an open tab keeps up. A failed re-poll shows "無法更新時間軸" with Retry but keeps the frames on screen and does not stop playback.
