@@ -72,7 +72,7 @@ Interaction:
 - Keyboard: Space play/pause, ← → step. When the map itself has keyboard focus (reached by Tab) the arrows pan the map instead.
 - Clicking a station opens its card; the card's readings follow the timeline, and its chart shows the 24 h around the map time.
 - On the forecast layer the timeline is the week ahead, a day per frame ("今天", "明天", "3 天後"), 即時 is today, and the station dots stay off. The card opens on 臺北市 as soon as the layer is picked; tapping a county on the map or picking one from the card's list changes it, and the chosen county is outlined white. The chart marks the timeline's day with the dashed line and the table stresses it.
-- Status messages (loading, no data for this time, request failed) appear as one line inside the timeline panel, with a Retry button when retrying can help.
+- Status messages (loading, no data for this time, request failed) take the place of the range text on the timeline panel's bottom line, with a Retry button when retrying can help. They never add a line: one that came and went (loading, for the first frame of every playback) grew the panel 20 px and shifted the legend and the cards with it (measured per animation frame, 2026-10-10).
 
 ---
 

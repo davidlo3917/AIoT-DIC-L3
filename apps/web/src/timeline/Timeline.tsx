@@ -91,16 +91,20 @@ export default function Timeline({ status }: { status: Status }) {
           </select>
         </label>
       </div>
-      {shown && <div className="flex items-center justify-between gap-2 text-sm text-amber-200" role="status">
-        <span>{t(shown.key)}</span>
-        {shown.action && <button type="button" className="ui-button shrink-0 px-3 underline" onClick={shown.action.run}>{t(shown.action.key)}</button>}
-      </div>}
       <input type="range" min={0} max={Math.max(0, last)} value={Math.max(0, index)} onChange={(e) => actions.seek(Number(e.target.value))} disabled={last < 1}
         aria-label={t('timeline.time')} aria-valuetext={frame ? stamp.format(at(frame.time)) : undefined} className="block h-11 w-full" />
-      <div className="flex justify-between gap-2 text-[13px] tabular-nums text-slate-400">
+      <div className="flex items-center justify-between gap-2 text-[13px] tabular-nums text-slate-400">
         {/* Dates, not weekdays: a week back is the same weekday as today. */}
         <span className="whitespace-nowrap">{frames[0] ? edge.format(at(frames[0].time)) : ''}</span>
-        <span className={frames.length > 0 && frames.length <= 5 ? 'px-2 text-center text-amber-300' : undefined}>{history}</span>
+        {/* A status takes the range text's place on this line rather than a line of its own: a line that comes and goes
+            (loading shows for the first frame of every playback) grew the panel 20 px and shifted the legend and the
+            cards with it. The Retry button keeps its 44 px target by overflowing the line, not by stretching it. */}
+        {shown
+          ? <span role="status" className="flex min-w-0 items-center gap-2 text-amber-200">
+            <span className="truncate">{t(shown.key)}</span>
+            {shown.action && <button type="button" className="ui-button -my-3 shrink-0 px-2 underline" onClick={shown.action.run}>{t(shown.action.key)}</button>}
+          </span>
+          : <span className={frames.length > 0 && frames.length <= 5 ? 'px-2 text-center text-amber-300' : undefined}>{history}</span>}
         <span className="whitespace-nowrap">{frames[last] ? edge.format(at(frames[last].time)) : ''}</span>
       </div>
     </section>
