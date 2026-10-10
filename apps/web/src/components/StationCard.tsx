@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
-import { getForecast, getHistory, getObservations, type ForecastPeriod, type Observation, type Readings, type Station } from '../api'
-import { dayTime, monthDay, t, weekday } from '../i18n'
+import { getHistory, getObservations, type Observation, type Readings, type Station } from '../api'
+import { dayTime, t } from '../i18n'
 import { LAYERS } from '../layers'
 import { FIELD } from '../map/layers/stations'
 import { RAMPS } from '../ramps'
 import { actions, currentFrame, useStore } from '../timeline/store'
+import ForecastTable, { forecastStatus } from './ForecastTable'
 import Sparkline from './Sparkline'
-import { forecastDays, weatherIcon, type ForecastDay } from './chartData'
+import { upcomingWeek } from './chartData'
+import { useEscape, useForecast } from './hooks'
 
 type Row = Readings & { observedAt: string }
 const MOUNTAIN_M = 1000 // above this a station reads well below its township's forecast (玉山 sits in 信義鄉)
 const DAY = 86400e3
+const closeStation = () => actions.selectStation(null)
 
 export default function StationCard({ stations }: { stations: Station[] }) {
   const id = useStore((s) => s.selectedStation), variable = LAYERS[useStore((s) => s.layer)].stations
@@ -39,22 +42,10 @@ export default function StationCard({ stations }: { stations: Station[] }) {
   }, [station?.cwaStationId, refreshKey])
 
   // The township's forecast, not the station's: CWA forecasts per 鄉鎮, and every station names its own.
-  const [forecast, setForecast] = useState<ForecastPeriod[] | 'error' | null>(null)
-  useEffect(() => {
-    if (!station?.county || !station.town) return
-    setForecast(null)
-    const ac = new AbortController()
-    getForecast(station.county, station.town, ac.signal).then(setForecast, (e) => e.name === 'AbortError' || setForecast('error'))
-    return () => ac.abort()
-  }, [station?.county, station?.town, refreshKey])
+  const forecast = useForecast(station?.county, station?.town)
+  useEscape(closeStation)
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && actions.selectStation(null)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
-  if (!station) return null
+  if (!station || !variable) return null // no readings to show on a layer without a station variable (the forecast)
   const ramp = RAMPS[variable], data = Array.isArray(rows) ? rows : []
   // The previous readings stay up until the next ones replace them: blanking them on every playback step flickered
   // the whole card. The time line names the readings shown, so the two always agree.
@@ -62,7 +53,7 @@ export default function StationCard({ stations }: { stations: Station[] }) {
   const num = (k: keyof Readings, digits = 1) => { const v = current?.value?.[k]; return v == null ? '—' : v.toFixed(digits) }
   const dir = current?.value?.windDirection, compass = t('compass').split(',')
   const now = Date.now()
-  const week = Array.isArray(forecast) ? forecastDays(forecast.filter((p) => Date.parse(p.end) > now)).slice(0, 7) : []
+  const week = Array.isArray(forecast) ? upcomingWeek(forecast, now) : []
   // The chart shows the 24 h around the map time out of the week fetched: the last 24 h while following now,
   // centred on the map time when it is further back, so its dashed line is always on the chart.
   const end = Math.min(now, (frame ? Date.parse(frame.time) : now) + DAY / 2), start = end - DAY
@@ -70,8 +61,6 @@ export default function StationCard({ stations }: { stations: Station[] }) {
     const at = Date.parse(r.observedAt), v = r[FIELD[variable]]
     return v == null || at < start || at > end ? [] : [{ t: at, v }]
   })
-  const today = Math.floor((now + 8 * 3600e3) / DAY) // Taiwan's calendar day
-
   return (
     <aside aria-label={t('station.label', { name: station.name })} className="weather-panel pointer-events-auto max-h-[55dvh] w-full overflow-y-auto p-4 sm:max-h-none sm:w-[26rem] sm:max-w-full">
       <header className="mb-2 flex items-start justify-between gap-2">
@@ -93,34 +82,7 @@ export default function StationCard({ stations }: { stations: Station[] }) {
       {station.county && station.town && (
         <section className="mb-3 border-y border-[var(--border)] py-2">
           <h3 className="mb-1.5 text-sm text-slate-400">{t('forecast.title', { town: station.town })}</h3>
-          {forecast === null ? <p className="ui-muted py-1 text-sm">{t('forecast.loading')}</p> : forecast === 'error'
-            ? <p className="text-sm text-amber-200">{t('forecast.failed')}<button type="button" className="ui-button px-2 underline" onClick={actions.retry}>{t('retry')}</button></p>
-            : (
-              <table className="w-full table-fixed border-separate border-spacing-x-0.5 text-center text-sm">
-                <colgroup><col className="w-8" />{week.map((d) => <col key={d.noon} />)}</colgroup>
-                <thead>
-                  <tr>
-                    <td />
-                    {week.map((d) => (
-                      <th key={d.noon} scope="col" className="pb-1 font-normal leading-tight">
-                        <span className={Math.floor((d.noon + 8 * 3600e3) / DAY) === today ? 'font-semibold text-slate-100' : 'text-slate-300'}>
-                          {Math.floor((d.noon + 8 * 3600e3) / DAY) === today ? t('forecast.today') : weekday.format(d.noon)}
-                        </span>
-                        <span className="block text-xs text-slate-500">{monthDay.format(d.noon)}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(['day', 'night'] as const).map((part) => (
-                    <tr key={part}>
-                      <th scope="row" className="text-left text-xs font-normal text-slate-400 [writing-mode:vertical-rl]">{t(`forecast.${part}`)}</th>
-                      {week.map((d) => <ForecastCell key={d.noon} p={d[part]} part={part} />)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          {forecastStatus(forecast) ?? <ForecastTable week={week} />}
           {(station.elevation ?? 0) >= MOUNTAIN_M && <p className="mt-1 text-[13px] text-slate-400">{t('forecast.mountain')}</p>}
         </section>
       )}
@@ -132,20 +94,3 @@ export default function StationCard({ stations }: { stations: Station[] }) {
   )
 }
 
-/** One half-day: an icon, the half's temperature (the high by day, the low by night) and the chance of rain. */
-function ForecastCell({ p, part }: { p: ForecastDay['day']; part: 'day' | 'night' }) {
-  if (!p) return <td className="text-slate-600">—</td>
-  const temp = part === 'day' ? p.max : p.min, wet = (p.rainChance ?? 0) >= 30 // where people start to pack an umbrella
-  return (
-    <td className={`rounded-md py-1 ${part === 'day' ? 'bg-white/5' : 'bg-white/[0.02]'}`} title={p.weather ?? undefined}>
-      <span aria-hidden="true" className="block text-xl leading-tight">{p.weather ? weatherIcon(p.weather, p.start) : '—'}</span>
-      <span className="sr-only">{p.weather}</span>
-      <span className={`block tabular-nums ${part === 'day' ? 'font-semibold' : 'text-slate-300'}`}>{temp ?? '—'}°</span>
-      {p.rainChance != null && (
-        <span className={`block text-xs tabular-nums ${wet ? 'font-medium text-sky-300' : 'text-slate-500'}`}>
-          <span aria-hidden="true">☂</span><span className="sr-only">{t('forecast.rain')} </span>{p.rainChance}%
-        </span>
-      )}
-    </td>
-  )
-}

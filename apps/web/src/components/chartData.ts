@@ -1,4 +1,5 @@
 import type { ForecastPeriod } from '../api'
+import { taiwanDay } from '../i18n'
 
 export function chartExtent(points: { v: number }[], bars = false) {
   const min = Math.min(...points.map((p) => p.v)), max = Math.max(...points.map((p) => p.v))
@@ -24,6 +25,27 @@ export function weatherIcon(text: string, start: string) {
 
 export type ForecastDay = { noon: number; day?: ForecastPeriod; night?: ForecastPeriod }
 const HOUR = 3600e3, DAY = 24 * HOUR
+
+/** A day's extremes out of its periods: the highest high and the lowest low, or null when neither half has a number. */
+export function dayExtremes(periods: (ForecastPeriod | undefined)[]) {
+  const max = periods.flatMap((p) => p?.max ?? []), min = periods.flatMap((p) => p?.min ?? [])
+  return max.length && min.length ? { max: Math.max(...max), min: Math.min(...min) } : null
+}
+
+/**
+ * The week ahead as the cards show it and the map colours it: periods already over are dropped (so today is what is
+ * left of it) and so is the night still running before 06:00, which `forecastDays` files under yesterday; seven days
+ * from today, matching the forecast layer's frames.
+ */
+export const upcomingWeek = (periods: ForecastPeriod[], now: number) =>
+  forecastDays(periods.filter((p) => Date.parse(p.end) > now)).filter((d) => taiwanDay(d.noon) >= taiwanDay(now)).slice(0, 7)
+
+/** Per Taiwan day (as `taiwanDay` counts them), the week's extremes: what the forecast layer colours, from the same week the card shows. */
+export function weekExtremes(periods: ForecastPeriod[], now: number) {
+  const out = new Map<number, { max: number; min: number }>()
+  for (const d of upcomingWeek(periods, now)) { const x = dayExtremes([d.day, d.night]); if (x) out.set(taiwanDay(d.noon), x) }
+  return out
+}
 
 /**
  * CWA's 12-hour periods as one column per Taiwan day: 06–18 is the day, 18–06 that day's night, and an overnight

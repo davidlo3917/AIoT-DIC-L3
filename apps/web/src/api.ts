@@ -42,8 +42,18 @@ export function getObservations(at: string): Promise<Observation[]> {
   return hit
 }
 export type ForecastPeriod = { start: string; end: string; weather: string | null; min: number | null; max: number | null; rainChance: number | null }
-export const getForecast = (county: string, town: string, signal?: AbortSignal) =>
-  get<{ periods: ForecastPeriod[] }>(`/forecast?county=${encodeURIComponent(county)}&town=${encodeURIComponent(town)}`, signal).then((r) => r.periods)
+// One request per township, shared by the station card, the county card and the forecast layer's 22 counties, and kept
+// for the CDN's half hour so the map and the cards never disagree. A failure is kept as well, so a bad hour costs one
+// request per township and not 22 per frame; Retry clears it.
+const forecasts = new Map<string, { at: number; periods: Promise<ForecastPeriod[]> }>()
+export const invalidateForecasts = () => forecasts.clear()
+export function getForecast(county: string, town: string): Promise<ForecastPeriod[]> {
+  const key = `${county}/${town}`, hit = forecasts.get(key)
+  if (hit && Date.now() - hit.at < 30 * 60e3) return hit.periods
+  const periods = get<{ periods: ForecastPeriod[] }>(`/forecast?county=${encodeURIComponent(county)}&town=${encodeURIComponent(town)}`).then((r) => r.periods)
+  forecasts.set(key, { at: Date.now(), periods })
+  return periods
+}
 // Shapes mirror apps/api/src/cwa/typhoon.ts: wind in m/s, pressure in hPa, radii in km.
 export type Fix = { time: string; lon: number; lat: number; wind: number | null; pressure: number | null; r15: number | null; r25: number | null; r70: number | null }
 export type Cyclone = { name: string | null; cwaName: string | null; analysis: Fix[]; forecast: Fix[] }

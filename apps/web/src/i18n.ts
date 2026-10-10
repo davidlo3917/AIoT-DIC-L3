@@ -13,8 +13,9 @@ export const zh = {
   'layer.satellite': '衛星', 'layer.satellite.hint': '目前哪裡有雲（紅外線）',
   'layer.wind': '風', 'layer.wind.hint': '預報地面風，含未來 3 天',
   'layer.humidity': '濕度', 'layer.humidity.hint': '由測站資料推估',
+  'layer.forecast': '預報', 'layer.forecast.hint': '各縣市未來一週氣溫，點選縣市看逐日高低溫',
   'legend.label': '{name}色階，{lo} 到 {hi} {unit}。{hint}',
-  'stations.toggle': '測站', 'stations.zoomHint': '放大看更多', 'stations.title': '縮小時只顯示主要測站，放大地圖可看到更多',
+  'stations.toggle': '測站', 'stations.zoomHint': '放大看更多', 'stations.title': '縮小時只顯示主要測站，放大地圖可看到更多', 'stations.none': '預報圖層不顯示測站',
 
   'timeline.label': '時間軸',
   'timeline.prev': '上一個時間', 'timeline.next': '下一個時間', 'timeline.play': '播放', 'timeline.pause': '暫停',
@@ -23,7 +24,7 @@ export const zh = {
   'timeline.latest': '回到最新', 'timeline.latest.title': '跳到最新資料並持續更新',
   'timeline.speed': '速度', 'timeline.speed.label': '播放速度', 'timeline.time': '時間',
   'every.10': '每 10 分鐘', 'every.60': '每小時', 'every.360': '每 6 小時',
-  'timeline.past': '過去 {reach} · {every}更新', 'timeline.span': '過去 {reach}到未來 {ahead} · {every}更新', 'timeline.days': '{days} 天', 'timeline.hours': '{hours} 小時',
+  'timeline.past': '過去 {reach} · {every}更新', 'timeline.week': '今天起 7 天 · 一天一格', 'timeline.span': '過去 {reach}到未來 {ahead} · {every}更新', 'timeline.days': '{days} 天', 'timeline.hours': '{hours} 小時',
   'timeline.few': '目前只有 {n} 筆資料，還在累積中，{every}新增一筆',
   'timeline.one': '目前只有一筆資料，還無法播放；{every}會有新資料',
   'timeline.loading': '載入時間軸中…', 'timeline.none': '目前還沒有資料', 'timeline.unavailable': '無法取得時間軸',
@@ -57,6 +58,10 @@ export const zh = {
   'forecast.rain': '降雨機率', 'forecast.mountain': '預報為整個鄉鎮的天氣；本站海拔較高，實際氣溫通常較低。',
   'forecast.today': '今天', 'forecast.day': '白天', 'forecast.night': '晚上',
 
+  'county.label': '{county}一週預報', 'county.select': '選擇縣市', 'county.rep': '以{town}的鄉鎮預報代表',
+  'county.chart': '逐日最高與最低氣溫', 'county.chartLabel': '一週最高 {max}、最低 {min} °C', 'county.max': '最高', 'county.min': '最低',
+  'county.short': '預報資料不足。',
+
   'warnings.title': '警特報', 'warnings.hint': '點選看範圍與內容', 'warnings.summary': '{n} 縣市 · 至 {until}', 'warnings.text': '氣象署說明',
   'typhoon.title': '颱風', 'typhoon.hint': '點選可查看路徑與預測', 'typhoon.td': '熱帶性低氣壓',
   'typhoon.stats': '{pressure} hPa · {wind} m/s · {time}',
@@ -79,8 +84,16 @@ export const weekdayTime = clock({ weekday: 'short' }) // 週一 13:50 — the e
 export const dayTime = clock({ day: 'numeric', month: 'short' }) // 10月5日 13:50
 export const shortDayTime = clock({ day: 'numeric', month: 'numeric' }) // 10/5 13:50 — where room is short
 export const fullTime = clock({ weekday: 'short', day: 'numeric', month: 'short' }) // 10月5日 週一 13:50
+export const fullDay = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', weekday: 'short', day: 'numeric', month: 'short' }) // 10月5日 週一 — a daily frame
 export const weekday = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', weekday: 'short' }) // 週一
 export const monthDay = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }) // 10/5
+
+/** Taiwan's calendar day as a count of days (UTC+8, no DST), so two instants compare as dates; `taiwanMidnight` is its inverse. */
+export const taiwanDay = (ms: number) => Math.floor((ms + 8 * 3600e3) / 86400e3)
+export const taiwanMidnight = (day: number) => day * 86400e3 - 8 * 3600e3
+const relDay = new Intl.RelativeTimeFormat('zh-TW', { numeric: 'auto' })
+/** A daily frame's distance from today: 今天, 明天, 後天, 3 天後. */
+export const dayAge = (time: number, now: number) => relDay.format(taiwanDay(time) - taiwanDay(now), 'day')
 
 const ago = new Intl.RelativeTimeFormat('zh-TW')
 /**

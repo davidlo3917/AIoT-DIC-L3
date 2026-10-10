@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PLAYBACK_DAYS } from '../api'
-import { age, dayTime, fullTime, shortDayTime, t } from '../i18n'
+import { age, dayAge, dayTime, fullDay, fullTime, monthDay, shortDayTime, t } from '../i18n'
 import { LAYERS } from '../layers'
 import { STATUS, type Status } from '../status'
 import { shortcut } from './shortcut'
@@ -19,7 +19,8 @@ export default function Timeline({ status }: { status: Status }) {
   // A failed refresh outranks whatever the map reports; an empty timeline speaks only when nothing else does.
   const shown: Status = loadState === 'error' ? STATUS.timelineError : status ?? (loadState === 'empty' ? STATUS.empty : null)
 
-  const { everyMin } = LAYERS[useStore((s) => s.layer)], every = t(`every.${everyMin}`)
+  const { everyMin, kind } = LAYERS[useStore((s) => s.layer)], every = t(`every.${everyMin}`)
+  const daily = kind === 'forecast' // a frame is a day, so the clock and the minutes-ago are noise
 
   // The frame's age is measured against a clock that ticks, so a tab left open does not keep saying "8 minutes ago".
   const [now, setNow] = useState(Date.now)
@@ -56,12 +57,12 @@ export default function Timeline({ status }: { status: Status }) {
   const reach = span > 36 * 3600e3 ? t('timeline.days', { days: Math.min(PLAYBACK_DAYS, Math.round(span / 86400e3)) }) : t('timeline.hours', { hours: Math.ceil(span / 3600e3) })
   const ahead = frames[last] ? Date.parse(frames[last].time) - now : 0 // a forecast layer's frames run on past now
   // A young layer has little to play; say so, or a Play button that is disabled (or done in one step) looks broken.
-  const history = frames.length > 5 ? ahead > 3600e3 ? t('timeline.span', { reach, ahead: t('timeline.days', { days: Math.max(1, Math.round(ahead / 86400e3)) }), every }) : t('timeline.past', { reach, every })
+  const history = daily && frames.length ? t('timeline.week') : frames.length > 5 ? ahead > 3600e3 ? t('timeline.span', { reach, ahead: t('timeline.days', { days: Math.max(1, Math.round(ahead / 86400e3)) }), every }) : t('timeline.past', { reach, every })
     : frames.length > 1 ? t('timeline.few', { n: frames.length, every })
     : frames.length === 1 ? t('timeline.one', { every })
     : t(loadState === 'loading' ? 'timeline.loading' : loadState === 'empty' ? 'timeline.none' : 'timeline.unavailable')
   const btn = 'ui-button grid h-11 w-11 place-items-center'
-  const at = (time: string) => new Date(time)
+  const at = (time: string) => new Date(time), stamp = daily ? fullDay : fullTime, edge = daily ? monthDay : shortDayTime
   return (
     <section aria-label={t('timeline.label')} data-pad="timeline" className="weather-panel pointer-events-auto px-3 py-2">
       <div className="flex flex-wrap items-center gap-1">
@@ -72,10 +73,10 @@ export default function Timeline({ status }: { status: Status }) {
         <div className="order-first min-w-0 basis-full pb-1 sm:order-none sm:ml-3 sm:basis-auto sm:flex-1 sm:pb-0">
           <div className="flex items-baseline gap-2">
             <time className="whitespace-nowrap text-base font-semibold tabular-nums" dateTime={frame?.time}>
-              {frame ? <><span className="sm:hidden">{dayTime.format(at(frame.time))}</span><span className="hidden sm:inline">{fullTime.format(at(frame.time))}</span></> : '—'}
+              {frame ? daily ? fullDay.format(at(frame.time)) : <><span className="sm:hidden">{dayTime.format(at(frame.time))}</span><span className="hidden sm:inline">{fullTime.format(at(frame.time))}</span></> : '—'}
             </time>
-            <span className="ui-muted text-[13px]">UTC+8</span>
-            {frame && <span className="ui-muted truncate text-[13px]">· {age(Date.parse(frame.time), now)}</span>}
+            {!daily && <span className="ui-muted text-[13px]">UTC+8</span>}
+            {frame && <span className="ui-muted truncate text-[13px]">· {(daily ? dayAge : age)(Date.parse(frame.time), now)}</span>}
           </div>
         </div>
         {/* One control for "am I seeing now?": lit while following the newest data, the way back otherwise. */}
@@ -95,12 +96,12 @@ export default function Timeline({ status }: { status: Status }) {
         {shown.action && <button type="button" className="ui-button shrink-0 px-3 underline" onClick={shown.action.run}>{t(shown.action.key)}</button>}
       </div>}
       <input type="range" min={0} max={Math.max(0, last)} value={Math.max(0, index)} onChange={(e) => actions.seek(Number(e.target.value))} disabled={last < 1}
-        aria-label={t('timeline.time')} aria-valuetext={frame ? fullTime.format(at(frame.time)) : undefined} className="block h-11 w-full" />
+        aria-label={t('timeline.time')} aria-valuetext={frame ? stamp.format(at(frame.time)) : undefined} className="block h-11 w-full" />
       <div className="flex justify-between gap-2 text-[13px] tabular-nums text-slate-400">
         {/* Dates, not weekdays: a week back is the same weekday as today. */}
-        <span className="whitespace-nowrap">{frames[0] ? shortDayTime.format(at(frames[0].time)) : ''}</span>
+        <span className="whitespace-nowrap">{frames[0] ? edge.format(at(frames[0].time)) : ''}</span>
         <span className={frames.length > 0 && frames.length <= 5 ? 'px-2 text-center text-amber-300' : undefined}>{history}</span>
-        <span className="whitespace-nowrap">{frames[last] ? shortDayTime.format(at(frames[last].time)) : ''}</span>
+        <span className="whitespace-nowrap">{frames[last] ? edge.format(at(frames[last].time)) : ''}</span>
       </div>
     </section>
   )

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { chartExtent, forecastDays, weatherIcon } from './chartData'
+import { chartExtent, forecastDays, upcomingWeek, weatherIcon } from './chartData'
 
 test('constant weather readings keep actual extrema while the plotting axis gets padding', () => {
   assert.deepEqual(chartExtent([{ v: 25 }, { v: 25 }]), { min: 25, max: 25, low: 24, high: 26 })
@@ -38,4 +38,14 @@ test('forecast periods group into Taiwan days, overnight with the evening before
   assert.equal(late[0].night?.start, '2026-10-09T16:00:00Z', 'after midnight, the rest of the night is still Friday\'s')
   assert.equal(late[0].day, undefined)
   assert.equal(late[1].day?.start, '2026-10-09T22:00:00Z')
+})
+
+test('the week ahead starts today: before 06:00 the running night, filed under yesterday, is left out', () => {
+  const p = (start: string, end: string) => ({ start, end, weather: null, min: null, max: null, rainChance: null })
+  const periods = [p('2026-10-09T10:00:00Z', '2026-10-09T22:00:00Z'), p('2026-10-09T22:00:00Z', '2026-10-10T10:00:00Z'), p('2026-10-10T10:00:00Z', '2026-10-10T22:00:00Z')] // Fri night, Sat day, Sat night
+  const week = upcomingWeek(periods, Date.parse('2026-10-09T18:00:00Z')) // Saturday 02:00 Taipei
+  assert.equal(week.length, 1)
+  assert.equal(week[0].day?.start, '2026-10-09T22:00:00Z')
+  assert.equal(week[0].night?.start, '2026-10-10T10:00:00Z')
+  assert.equal(upcomingWeek(periods, Date.parse('2026-10-09T12:00:00Z')).length, 2, 'Friday evening still has its night')
 })

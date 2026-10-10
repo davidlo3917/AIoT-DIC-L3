@@ -1,18 +1,18 @@
 import type { FrameLayer } from './api'
 import { RADAR_RAMP, RAMPS, type Ramp, type Variable } from './ramps'
 
-export type LayerId = 'temperature' | 'rain' | 'radar' | 'satellite' | 'humidity' | 'wind'
+export type LayerId = 'temperature' | 'rain' | 'radar' | 'satellite' | 'humidity' | 'wind' | 'forecast'
 
 /** Names and one-line explanations live in the dictionary (i18n.ts) as `layer.<id>` and `layer.<id>.hint`. */
 type LayerDef = {
-  frames: FrameLayer // which timeline it runs on
-  everyMin: 10 | 60 | 360 // how often CWA publishes a new frame
+  everyMin: 10 | 60 | 360 // how often CWA publishes a new frame (the forecast's frames are a day apart, but CWA reissues it every 6 h)
   loop: number // hours replayed when Play starts from the newest frame: enough to see the weather move, short enough to sit through
-  stations: Variable // what the station dots (and the station card's chart) show while this layer is active
+  stations?: Variable // what the station dots (and the station card's chart) show while this layer is active; none on a layer that draws no readings
   landOnly: boolean // clipped to the coastline by the basemap's water
 } & (
-  | { kind: 'grid' | 'stations-idw' | 'wind'; legend: Ramp } // coloured here, so the ramp is the picture
-  | { kind: 'image'; legend?: Ramp } // drawn as CWA published it; a legend only where the picture has a scale to read
+  | { frames: FrameLayer; kind: 'grid' | 'stations-idw' | 'wind'; legend: Ramp } // frames from /api/frames, coloured here, so the ramp is the picture
+  | { frames: FrameLayer; kind: 'image'; legend?: Ramp } // drawn as CWA published it; a legend only where the picture has a scale to read
+  | { frames: 'forecast'; kind: 'forecast'; legend: Ramp } // seven daily frames made in the browser; the counties coloured from CWA's township forecast (map/layers/forecast.ts)
 )
 
 export const LAYERS: Record<LayerId, LayerDef> = {
@@ -25,4 +25,6 @@ export const LAYERS: Record<LayerId, LayerDef> = {
   wind: { frames: 'wind', everyMin: 360, loop: 84, kind: 'wind', stations: 'wind', landOnly: false, legend: RAMPS.wind },
   // CWA publishes no humidity grid, so this one follows the station clock and is interpolated in the browser.
   humidity: { frames: 'stations', everyMin: 10, loop: 3, kind: 'stations-idw', stations: 'humidity', landOnly: true, legend: RAMPS.humidity },
+  // The week ahead, a day per frame: each county painted with the average of its day's high and low, on the temperature ramp.
+  forecast: { frames: 'forecast', everyMin: 360, loop: 168, kind: 'forecast', landOnly: false, legend: RAMPS.temperature },
 }

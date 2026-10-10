@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getStations, type Station } from './api'
 import LayerPanel, { StationsToggle } from './components/LayerPanel'
+import CountyCard from './components/CountyCard'
 import Legend from './components/Legend'
 import StationCard from './components/StationCard'
 import Typhoons from './components/Typhoons'
@@ -21,7 +22,9 @@ export default function App() {
   const [stations, setStations] = useState<Station[]>([])
   const [stationError, setStationError] = useState(false)
   const refreshKey = useStore((s) => s.refreshKey)
-  const selectedStation = useStore((s) => s.selectedStation)
+  const selectedStation = useStore((s) => s.selectedStation), selectedCounty = useStore((s) => s.selectedCounty), layer = useStore((s) => s.layer)
+  // The forecast layer's card is a county's week; every other layer's is a station's readings.
+  const cardOpen = (layer === 'forecast' ? selectedCounty : selectedStation) !== null
   useEffect(() => {
     let alive = true
     setStationError(false)
@@ -44,8 +47,10 @@ export default function App() {
         <div className="flex min-h-0 flex-1 flex-col gap-2 sm:flex-row">
           {/* pr-14 keeps the phone's layer row clear of the map controls. On roomy screens the legend sits under the
               layer list, so the station card on the other side can reach down to the timeline. The alerts go under
-              the layer row on compact screens and top-right, above the station card, on roomy ones. */}
-          <div className="flex min-h-0 min-w-0 flex-col gap-2 pr-14 sm:pr-0 desk:shrink-0">
+              the layer row on compact screens and top-right, above the station card, on roomy ones. From sm up the
+              layer row keeps its width and the card on the other side gives way: a phone on its side has room for
+              one, and a hidden layer button is worse than a narrower card. */}
+          <div className="flex min-h-0 min-w-0 flex-col gap-2 pr-14 sm:shrink-0 sm:pr-0">
             <LayerPanel />
             {/* A phone on its side has no room for them under the layer row; the outlines on the map still show. */}
             <Alerts className="flex sm:max-w-sm desk:hidden [@media(max-height:399px)]:hidden" />
@@ -53,12 +58,12 @@ export default function App() {
           </div>
           <div className="mt-auto flex min-h-0 min-w-0 flex-col gap-2 sm:mr-16 sm:mt-0 sm:ml-auto">
             {/* An open station card has the column: the card needs its full height at 1280×800, and the outlines stay on the map. */}
-            <Alerts className={`${selectedStation !== null ? 'hidden' : 'hidden desk:flex'} desk:w-72 desk:self-end`} />
-            <div className="mt-auto flex min-h-0 flex-col"><StationCard key={selectedStation} stations={stations} /></div>
+            <Alerts className={`${cardOpen ? 'hidden' : 'hidden desk:flex'} desk:w-72 desk:self-end`} />
+            <div className="mt-auto flex min-h-0 flex-col">{layer === 'forecast' ? <CountyCard stations={stations} /> : <StationCard key={selectedStation} stations={stations} />}</div>
           </div>
         </div>
         {/* Compact layouts only; it makes way for an open station card. */}
-        <div data-pad="legend" className={`${selectedStation !== null ? 'hidden' : 'flex'} flex-row-reverse items-end justify-between gap-2 sm:flex-row sm:justify-start desk:hidden`}>
+        <div data-pad="legend" className={`${cardOpen ? 'hidden' : 'flex'} flex-row-reverse items-end justify-between gap-2 sm:flex-row sm:justify-start desk:hidden`}>
           <Legend />
           <div className="weather-panel pointer-events-auto desk:hidden"><StationsToggle className="flex" /></div>
         </div>

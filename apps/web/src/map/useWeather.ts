@@ -8,6 +8,7 @@ import { corners, loadField, loadImage, loadWind, paint, type Field, type WindFi
 import { idw } from './layers/idw'
 import { startParticles } from './layers/particles'
 import { hourly, speedAt } from './layers/wind'
+import { addForecastLayers, countyFeatures, countyForecasts, forecastFrames, setForecastSelection, updateForecast } from './layers/forecast'
 import { addStationLayers, updateStations, setStationsVisible } from './layers/stations'
 import { addTyphoonLayers, cycloneBounds, setTyphoonsVisible, updateTyphoons } from './layers/typhoon'
 import { addWarningLayers, countyBounds, updateWarnings, type Counties } from './layers/warnings'
@@ -15,7 +16,7 @@ import { HOME, REFERENCE_LAYER } from './basemap'
 
 const SURFACE = 'surface'
 const COAST = 'surface-coast' // copy of the basemap's water, drawn over land-only layers so the real coastline clips them
-const OPACITY = { grid: 0.92, 'stations-idw': 0.92, image: 0.85, wind: 0.9 }
+const OPACITY = { grid: 0.92, 'stations-idw': 0.92, image: 0.85, wind: 0.9, forecast: 0 } // the forecast is counties, not a surface
 const FRAME_MS = 700 // how long a frame stays up at 1×
 
 const scratch = () => Object.assign(document.createElement('canvas'), { width: 2, height: 2 })
@@ -68,6 +69,12 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     .then((mask) => { if (!mask) landMask.current = null; return mask }, (e) => { landMask.current = null; throw e })
   // The wind field on the map, read by the particle loop every animation frame; null draws no particles.
   const windField = useRef<WindField | null>(null)
+  // The 22 county outlines (a static file), fetched the first time an advisory is opened or the forecast layer is up;
+  // a failure is forgotten so the next try fetches again.
+  const counties = useRef<Promise<Counties> | null>(null)
+  const getCounties = () => counties.current ??= fetch('/counties.json')
+    .then((r) => r.ok ? r.json() as Promise<Counties> : Promise.reject(new Error(`counties: ${r.status}`)))
+    .catch((e) => { counties.current = null; throw e })
 
   useEffect(() => {
     if (!map) return
@@ -76,6 +83,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     map.addLayer({ id: SURFACE, type: 'raster', source: SURFACE, paint: { 'raster-opacity': 0, 'raster-opacity-transition': { duration: 0, delay: 0 }, 'raster-fade-duration': 0, 'raster-resampling': 'linear' } }, firstLabel)
     const water = map.getStyle().layers.find((l) => l.id === 'water')
     if (water?.type === 'fill') map.addLayer({ ...water, id: COAST, paint: { 'fill-color': map.getPaintProperty('water', 'fill-color') as string } }, firstLabel)
+    const removeForecast = addForecastLayers(map, firstLabel, actions.selectCounty) // the week's county colours, under the roads and names like the surface
     const removeWarnings = addWarningLayers(map) // over the weather and the coast clip (澎湖 is mostly sea), under the typhoons and stations
     const removeTyphoons = addTyphoonLayers(map) // a track crosses the sea too
     const removeStations = addStationLayers(map, actions.selectStation)
@@ -87,6 +95,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
       removeStations()
       removeTyphoons()
       removeWarnings()
+      removeForecast()
       for (const id of [COAST, SURFACE]) if (map.getLayer(id)) map.removeLayer(id)
       if (map.getSource(SURFACE)) map.removeSource(SURFACE)
     }
@@ -104,6 +113,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     surface.bounds = ''
     surface.canvas.getContext('2d')!.clearRect(0, 0, surface.canvas.width, surface.canvas.height)
     windField.current = null
+    updateForecast(map, null)
     setStationsVisible(map, false)
     setShown(null)
     setStatus(null)
@@ -122,7 +132,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     const ac = new AbortController()
     const load = () => {
       const token = actions.beginLoad(layerId)
-      getFrames(layer.frames, ac.signal).then(
+      ;(layer.kind === 'forecast' ? Promise.resolve(forecastFrames()) : getFrames(layer.frames, ac.signal)).then(
         (frames) => { if (!ac.signal.aborted) actions.setFrames(layerId, token, layer.kind === 'wind' ? hourly(frames) : frames) },
         (e) => { if (e.name !== 'AbortError' && !ac.signal.aborted) actions.failLoad(layerId, token) },
       )
@@ -139,11 +149,16 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
       map.setPaintProperty(SURFACE, 'raster-opacity', 0)
       surface.bounds = ''
       windField.current = null
+      updateForecast(map, null)
       setStationsVisible(map, false)
       setShown(null)
       setStatus(null)
       return
     }
+    // The forecast's townships come from the station list: until it arrives nothing can be drawn, so the frame is
+    // not "shown" (playback waits) and the effect runs again when the list is here. If it never comes, the timeline's
+    // station-list error outranks this status.
+    if (layer.kind === 'forecast' && !stations.length) return setStatus(STATUS.loadingWeather)
     let alive = true
     setShown(null)
     since.current = performance.now()
@@ -216,6 +231,11 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
           windField.current = field // the particles pick it up on their next animation frame
           paint(field, layer.legend, s.to) // the surface is the speed; the particles are the direction
           await show(s.to, field.bounds)
+        } else if (layer.kind === 'forecast') {
+          const [outlines, week] = await Promise.all([getCounties(), countyForecasts(stations)]) // 22 townships, cached in api.ts
+          if (!alive) return
+          clearTimeout(loading)
+          updateForecast(map, countyFeatures(outlines, week, frame.time))
         } else {
           const field = await loadField(frame)
           if (!alive) return
@@ -228,6 +248,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
         map.setPaintProperty(SURFACE, 'raster-opacity', 0)
         s.bounds = '' // the next good frame cuts in instead of blending from a picture nobody saw
         windField.current = null
+        updateForecast(map, null)
         setStatus(STATUS.noData)
       } finally { clearTimeout(loading); if (alive) setShown(frame) } // a hole in the data must not stall playback either
     })()
@@ -256,12 +277,14 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     setStationStatus(null)
     // The previous frame's stations stay up until this one's replace them: hiding them in between blinks every label.
     // A frame ahead of now (the wind forecast) has no readings: the effect below puts the forecast on the dots instead.
-    if (!frame || !showStations || (future && layer.kind !== 'wind')) return setStationsVisible(map, false)
+    // A layer without a station variable (the forecast's counties) draws no dots at all.
+    const variable = layer.stations
+    if (!frame || !showStations || !variable || (future && layer.kind !== 'wind')) return setStationsVisible(map, false)
     if (future) return
     let alive = true
     getObservations(frame.time).then((obs) => {
       if (!alive) return
-      updateStations(map, stations, obs, layer.stations)
+      updateStations(map, stations, obs, variable)
       if (!obs.length) setStationStatus(STATUS.noStationReadings)
     }, () => {
       if (!alive) return
@@ -317,11 +340,12 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     if (playing && (lng < w || lng > e || lat < s || lat > n)) map.flyTo({ center: HOME.center, zoom: HOME.zoom })
   }, [map, playing])
 
-  // County advisories, same pattern. The map draws only the advisory the viewer opened in the panel; the county
-  // outlines (a static 22-polygon file) are fetched the first time one is opened, and forgotten on failure so the next
-  // try fetches again.
+  // The county the forecast card shows is outlined on the map (the source is empty on every other layer).
+  const selectedCounty = useStore((s) => s.selectedCounty)
+  useEffect(() => { if (map) setForecastSelection(map, selectedCounty) }, [map, selectedCounty])
+
+  // County advisories, same pattern. The map draws only the advisory the viewer opened in the panel.
   const warnings = useStore((s) => s.warnings), warningFocus = useStore((s) => s.warningFocus)
-  const counties = useRef<Promise<Counties> | null>(null)
   useEffect(() => {
     const ac = new AbortController()
     const load = () => getWarnings(ac.signal).then(actions.setWarnings, () => {})
@@ -333,8 +357,7 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
     if (!map) return
     if (warningFocus == null) return updateWarnings(map, null, [], null)
     let alive = true
-    counties.current ??= fetch('/counties.json').then((r) => r.ok ? r.json() : Promise.reject(new Error(`counties: ${r.status}`)))
-    counties.current.then((c) => { if (alive) updateWarnings(map, c, warnings, warningFocus) }, () => { counties.current = null })
+    getCounties().then((c) => { if (alive) updateWarnings(map, c, warnings, warningFocus) }, () => {})
     return () => { alive = false }
   }, [map, warnings, warningFocus])
   // Opening an advisory also brings its counties into view (a refreshed list keeps the focus and must not fly again).
@@ -351,10 +374,10 @@ export function useWeather(map: MapLibreMap | null, stations: Station[]) {
   // Warm the caches two frames ahead so playback doesn't stutter on the network.
   useEffect(() => {
     for (const next of frames.slice(index + 1, index + 3)) {
-      if ((layer.kind === 'stations-idw' || showStations) && Date.parse(next.time) <= Date.now()) getObservations(next.time).catch(() => {})
+      if ((layer.kind === 'stations-idw' || (showStations && layer.stations)) && Date.parse(next.time) <= Date.now()) getObservations(next.time).catch(() => {})
       if (next.url || next.between) (layer.kind === 'image' ? loadImage(next.url!, next.bounds!) : layer.kind === 'wind' ? loadWind(next) : loadField(next)).catch(() => {})
     }
-  }, [frames, index, layer.kind, showStations])
+  }, [frames, index, layer.kind, layer.stations, showStations])
 
   return status ?? stationStatus
 }

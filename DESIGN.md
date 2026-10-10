@@ -16,6 +16,7 @@ What a visitor gets:
 - 1,367 weather and rain-gauge stations drawn as value-labelled dots, thinned by zoom level
 - A station card with the current readings, the township's 7-day forecast and a 24-hour chart
 - A shared timeline that plays back the last **7 days** of every layer at 10-minute (or hourly) steps; the wind layer is a model forecast and runs on **3.5 days ahead** as well
+- A forecast layer: the 22 counties coloured by each day's forecast temperature for the **week ahead**, a day per timeline step, with a county card (county list, high/low chart, day/night table)
 - Traditional Chinese (Taiwan) interface only; all times in Taiwan time (UTC+8)
 - Works on phones, including landscape
 
@@ -59,7 +60,7 @@ The application is a map, not a dashboard. Everything else floats over it and gi
 Layout rules (implemented in `App.tsx` with Tailwind variants):
 
 - **Roomy screens** (≥ 640 px wide *and* tall): layer list and legend in a left sidebar, station card on the right reaching down to the timeline.
-- **Compact screens** (phones, either orientation): the layer list becomes one row of buttons, the stations toggle moves next to the legend, and the legend row hides while a station card is open.
+- **Compact screens** (phones, either orientation): the layer list becomes a 4 × 2 grid of buttons on an upright phone (seven 44 px targets do not fit its width in one row) and one row on its side, the stations toggle moves next to the legend, and the legend row hides while a card is open.
 - The **timeline never leaves the screen**. The region that shrinks and scrolls is the layer list / station card. A phone in landscape leaves ~300 px under the browser's bars; the title hides below 360 px of height.
 - Every control is at least 44 × 44 px, keyboard reachable, and labelled for screen readers (the legend is an `img` with a sentence as its label).
 
@@ -70,6 +71,7 @@ Interaction:
 - **Play** from the newest frame replays the recent loop (3 h; the whole day for the hourly temperature layer) rather than the whole week. From anywhere else it plays forward; on the wind layer that means through the forecast, and the end of it returns to the present.
 - Keyboard: Space play/pause, ← → step. When the map itself has keyboard focus (reached by Tab) the arrows pan the map instead.
 - Clicking a station opens its card; the card's readings follow the timeline, and its chart shows the 24 h around the map time.
+- On the forecast layer the timeline is the week ahead, a day per frame ("今天", "明天", "3 天後"), 即時 is today, and the station dots stay off. The card opens on 臺北市 as soon as the layer is picked; tapping a county on the map or picking one from the card's list changes it, and the chosen county is outlined white. The chart marks the timeline's day with the dashed line and the table stresses it.
 - Status messages (loading, no data for this time, request failed) appear as one line inside the timeline panel, with a Retry button when retrying can help.
 
 ---
@@ -84,6 +86,7 @@ Interaction:
 | 衛星 Satellite | Himawari infrared colour cloud picture, coastlines drawn in | `O-C0042-002` (JPG, 800²) | 10 min | same as radar; no legend, the picture has no scale to read |
 | 風 Wind | 10 m wind of CWA's WRF 3 km forecast, 0 to +84 h: speed as colour, direction as moving particles | `M-A0064` (GRIB2, 1158 × 673 Lambert grid, ~180 MB per lead time) | 6 h, four runs a day; hourly on the timeline, blended in between | the two wind fields are range-read and decoded in the API → uv8 PNG frame → coloured and animated in the browser |
 | 濕度 Humidity | Relative humidity | station observations (no CWA grid exists) | 10 min | interpolated in the browser (§13) |
+| 預報 Forecast | Each county's forecast temperature for the week ahead: the average of the day's high and low, on the temperature ramp | the township 7-day forecast below, one township per county | 6 h (CWA); refetched every 30 min | 22 forecasts fetched by the browser through `/api/forecast`, painted onto the county outlines (§13) |
 
 Station data:
 
@@ -170,9 +173,9 @@ Deliberately absent: Turborepo, a `packages/` layer, Python/ecCodes GRIB tooling
 │   │       ├── ramps.ts         colour ramps and MapLibre colour expressions
 │   │       ├── i18n.ts          every string, Taiwan-time formatters
 │   │       ├── status.ts        the status line's messages and actions
-│   │       ├── components/      LayerPanel, Legend, Warnings, Typhoons, StationCard, Sparkline, chartData
+│   │       ├── components/      LayerPanel, Legend, Warnings, Typhoons, StationCard, CountyCard, ForecastTable, WeekChart, Sparkline, chartData, hooks (the cards' forecast fetch and Escape)
 │   │       ├── map/             MapView, basemap filter, useWeather (surface + stations + overlays + playback)
-│   │       │   └── layers/      grid decode/paint, wind particles, IDW, station dots + zoom thinning, typhoon and advisory overlays
+│   │       │   └── layers/      grid decode/paint, wind particles, IDW, station dots + zoom thinning, county forecast, typhoon and advisory overlays
 │   │       └── timeline/        Timeline UI, store, keyboard shortcuts
 │   └── api/                     Hono API
 │       ├── src/
@@ -192,7 +195,7 @@ Deliberately absent: Turborepo, a `packages/` layer, Python/ecCodes GRIB tooling
 └── vercel.json                  build, rewrites, security headers
 ```
 
-Tests (`*.test.ts`) sit next to the code they test and run with Node's built-in runner: station/forecast normalisation, grid parsing, the GRIB2 reader (against the first 4 KB of a real WRF message, kept as a fixture), the wind resampling and encoding, query validation, the timeline store, request ordering, IDW, time formatting.
+Tests (`*.test.ts`) sit next to the code they test and run with Node's built-in runner: station/forecast normalisation, grid parsing, the GRIB2 reader (against the first 4 KB of a real WRF message, kept as a fixture), the wind resampling and encoding, query validation, the timeline store, request ordering, IDW, time formatting, the forecast layer's daily frames, representative townships and county colours.
 
 ---
 
@@ -335,6 +338,8 @@ layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 
 
 `latestIndex` is the last frame at or before now, with no tolerance (a wind frame minutes ahead has no station readings yet, so the dots would vanish at 即時 for half of every hour): simply the last frame for every layer that only has the past; for the wind forecast the slider continues 3.5 days past it. Following it means that, as time passes, the re-poll moves the viewer to the next forecast frame the way it moves them to a new radar picture.
 
+The forecast layer's frames are not fetched: `forecastFrames()` makes seven, one per Taiwan day from today, each at the day's midnight, so today is always the frame at or before now and 即時 means today. The Timeline shows that layer as a date with "今天 / 明天 / 3 天後" instead of a clock and a minutes-ago, and "今天起 7 天 · 一天一格" instead of a cadence (CWA reissues the forecast every 6 h, which is the layer's `everyMin`; the frames are a day apart).
+
 - `from` is rounded down to the hour so every visitor in that hour asks the CDN the same URL.
 - Frames are re-polled every 5 minutes so an open tab keeps up. A failed re-poll shows "無法更新時間軸" with Retry but keeps the frames on screen and does not stop playback.
 - Request tokens and AbortControllers make out-of-order answers harmless: an old layer's frames can never land on a new layer (tested in `store.test.ts`).
@@ -361,6 +366,8 @@ layer changes ──▶ request++ ──▶ GET /frames?layer=…&from=<now − 
 **Humidity.** No CWA grid exists, so the station readings are interpolated in the browser with inverse-distance weighting (1/d²) onto the latest temperature grid's land cells, which gives Taiwan's outline for free. ~3.5k land cells × ~1.2k stations ≈ 4M distances, ~20 ms. A k-nearest index is the upgrade if either count grows 10×.
 
 **Stations.** Drawn as a GeoJSON source with a circle layer (colour from the ramp) and a symbol layer (the value with its unit as a sign: 28.3°, 85%, 12.0 mm, 5.1 m/s). Zoomed out, only the most relevant stations are shown at least 56 px apart — room for the widest label, so a drawn dot always has its value (at 44 px, measured, one label in eight was lost to collisions at zooms 9–10); each zoom level from 5 to 11 adds the next most relevant ones that fit, computed once per frame in `minZooms()` and stored as a per-feature `minzoom` that the layer filter compares with the zoom. Relevance: staffed stations (`46…`) before automatic (`C0…`) before the rest, lower elevation first (the town over the peak above it); for rain, the wettest first, and dry gauges are not drawn at all. Labels blinked ~400 ms per step until two fixes: the map's `fadeDuration` is 0 (a label whose text changed counts as new and would fade in), and the previous frame's stations stay up until the next frame's replace them. The same keep-until-replaced rule holds for the station card, which otherwise blanked on every playback step.
+
+**Forecast.** No surface: the county outlines (the same static file the advisories use) are a GeoJSON fill under the roads and place names, coloured by the temperature ramp's MapLibre expression from each feature's `avg`, with a thin dark border and a white outline on the county the card shows. Every county is always drawn: one without a number for the day (its fetch failed, or CWA's week stops short) is grey, so it is visibly not a temperature and still there to tap. The data is CWA's township forecast, already proxied for the station card: when the layer is up the browser fetches the 22 counties' representative townships through `/api/forecast` (in parallel, `allSettled` so one county failing leaves the others coloured) and each frame takes its day's extremes from the same "week ahead" the cards show (`upcomingWeek`: periods already over are dropped, so after 18:00 today is tonight on the map and in the card alike, and the week starts today, since before 06:00 the running night is filed under yesterday and would push the seventh day out). `getForecast` in `api.ts` keeps each township's week for the CDN's half hour, shared by the map, the county card and the station card, so the three never disagree and an open tab still follows CWA's 6-hourly updates; a failed fetch is kept until Retry as well, so a bad hour costs one request per township and not 22 per frame. Until the station list is there the frame is not shown at all (playback waits), since the townships come from it. The station dots and their toggle are off on this layer, which has no station variable: a reading on top of a week's forecast would be read as part of it. A county's township is its lowest station's (`countyTowns`), so 嘉義縣 reads as 東石鄉 on the plain rather than 阿里山鄉, and the card names it; CWA's county-level forecast dataset is the upgrade if the official county number ever matters. The card's chart is a 30-line SVG with both lines and every value printed, which seven points allow and a tooltip would only hide.
 
 **Typhoons.** One GeoJSON source holds, per cyclone, the past track (solid), the forecast track (dashed), the fixes as dots (the current one orange and named, forecast ones labelled with their time), the 15 and 25 m/s wind radii at the current fix and the 70 % probability circles ahead; circles are 48-point rings on an equirectangular approximation. It sits above the weather and the coast clip (a track crosses the sea) and below the stations. The list is refetched every 10 minutes on its own clock. Storms are usually far off-screen, so a chip names each one; tapping it fits the track into the part of the screen the panels leave free (measured from the panels' edges, since an opened advisory changes them), or centres the storm there where the whole track cannot fit. The map's bounds were widened to CWA's basin (100–180°E, 0–50°N) for this. Playback hides the tracks (they are static, and the weather moving is the point) and, if the viewer had flown out to a storm, flies back to the opening view of Taiwan.
 
@@ -500,6 +507,7 @@ Facts worth knowing:
 - **2026-10-09** Station dots carry the forecast ahead of now (the field's speed at each anemometer station, drawn inverted) after the user watched them vanish the moment playback entered the forecast; the alternative, a note saying there are no readings, explained the gap without filling it.
 - **2026-10-09** Evening review pass: query instants snapped to the data grid (an unbounded CDN key space was the one load finding of the security review); station labels carry their unit and the station spacing grew to 56 px after measuring one label in eight lost to collisions; a repo-wide audit cut unused fields the typhoon and forecast proxies shipped, duplicated helpers and the pnpm-script layer under the Taskfile.
 - **2026-10-09** Wind timeline made hourly by blending the 6-hourly frames in the browser (what the plan called the shader lerp, done in a loop of 134k cells instead), and the particle canvas moved under the labels by showing it as a canvas source pinned to the view rather than a `CustomLayerInterface`: the source MapLibre already has does the upload and the ordering.
+- **2026-10-10** Forecast layer added (the course assignment's core deliverable: a region picked from a list, its week as a high/low chart and a table, a map coloured by a chosen day's forecast). Built as a seventh layer so the timeline is the date picker and the legend, playback and cards all come for free, on the township forecast proxy and county outlines already there: no new API route, no stored forecast. Counties are represented by a lowland township rather than a county-level CWA dataset, which would have meant a new normaliser for one number. The phone's layer row became a 4 × 2 grid when the seventh 44 px button no longer fit.
 
 ---
 
