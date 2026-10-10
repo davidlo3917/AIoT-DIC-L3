@@ -3,24 +3,24 @@
 以中央氣象署（CWA）開放資料製作的 Windy 風格臺灣天氣地圖：在地圖上看溫度、雨量、雷達回波、衛星雲圖、風場與濕度，可回放過去 7 天，風場並有未來 3 天的預報；另有各縣市未來一週的氣溫預報圖層。
 
 - 線上版：<https://a-io-t-dic-l3.vercel.app>
-- 設計文件：[DESIGN.md](DESIGN.md)（英文）
+- 設計文件：[DESIGN.md](https://github.com/davidlo3917/AIoT-DIC-L3/blob/main/DESIGN.md)（英文）
 
-![溫度圖層：全臺氣溫分布，左側為圖層列表，下方為時間軸](docs/screenshots/temperature.jpg)
+![溫度圖層：全臺氣溫分布，左側為圖層列表，下方為時間軸](https://raw.githubusercontent.com/davidlo3917/AIoT-DIC-L3/main/docs/screenshots/temperature.jpg)
 
 | 雷達回波 | 測站與資訊卡 |
 |---|---|
-| ![雷達圖層：目前哪裡在下雨](docs/screenshots/radar.jpg) | ![放大後顯示測站數值，點選測站開啟資訊卡、一週預報與 24 小時趨勢圖](docs/screenshots/stations.jpg) |
+| ![雷達圖層：目前哪裡在下雨](https://raw.githubusercontent.com/davidlo3917/AIoT-DIC-L3/main/docs/screenshots/radar.jpg) | ![放大後顯示測站數值，點選測站開啟資訊卡、一週預報與 24 小時趨勢圖](https://raw.githubusercontent.com/davidlo3917/AIoT-DIC-L3/main/docs/screenshots/stations.jpg) |
 
 | 風場預報 | 衛星雲圖 |
 |---|---|
-| ![風圖層：顏色為風速，流動的線條為風向，時間軸可看到未來 3 天](docs/screenshots/wind.jpg) | ![衛星圖層：向日葵衛星紅外線雲圖](docs/screenshots/satellite.jpg) |
+| ![風圖層：顏色為風速，流動的線條為風向，時間軸可看到未來 3 天](https://raw.githubusercontent.com/davidlo3917/AIoT-DIC-L3/main/docs/screenshots/wind.jpg) | ![衛星圖層：向日葵衛星紅外線雲圖](https://raw.githubusercontent.com/davidlo3917/AIoT-DIC-L3/main/docs/screenshots/satellite.jpg) |
 
-![預報圖層：各縣市依該日預報氣溫著色，時間軸一天一格；右側為縣市資訊卡，有縣市下拉選單、一週最高最低氣溫折線圖與白天晚上表格](docs/screenshots/forecast.jpg)
+![預報圖層：各縣市依該日預報氣溫著色，時間軸一天一格；右側為縣市資訊卡，有縣市下拉選單、一週最高最低氣溫折線圖與白天晚上表格](https://raw.githubusercontent.com/davidlo3917/AIoT-DIC-L3/main/docs/screenshots/forecast.jpg)
 
 <p>
-  <img src="docs/screenshots/mobile-radar.jpg" width="270" alt="手機版：雷達圖層">
+  <img src="https://raw.githubusercontent.com/davidlo3917/AIoT-DIC-L3/main/docs/screenshots/mobile-radar.jpg" width="270" alt="手機版：雷達圖層">
   &nbsp;
-  <img src="docs/screenshots/mobile-station.jpg" width="270" alt="手機版：測站資訊卡">
+  <img src="https://raw.githubusercontent.com/davidlo3917/AIoT-DIC-L3/main/docs/screenshots/mobile-station.jpg" width="270" alt="手機版：測站資訊卡">
 </p>
 
 ## 功能現況
